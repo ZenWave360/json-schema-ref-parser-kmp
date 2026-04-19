@@ -3,8 +3,6 @@ name: Verify Main and Publish Coverage
 on:
   push:
     branches: [ main ]
-#  pull_request:
-#    branches: [ '**' ]
   workflow_dispatch:
 
 jobs:
@@ -13,55 +11,102 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Set up the Java JDK
-        uses: actions/setup-java@v2
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
-          distribution: 'adopt'
+          distribution: 'temurin'
 
-      - name: Verify and Publish Coverage
-        run: mvn verify
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
-      - name: Checkout badges branch to a badges directory nested inside first checkout
-        uses: actions/checkout@v2
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build and test with coverage
+        run: ./gradlew build koverHtmlReport koverLog
+
+      - name: Print coverage to console
+        id: coverage
+        run: ./gradlew koverPrintCoverageDetailed
+        if: always()
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-reports
+          path: |
+            build/reports/kover/
+            build/reports/tests/
+
+      - name: Checkout badges branch
+        uses: actions/checkout@v4
+        if: github.event_name != 'pull_request'
         with:
           ref: badges
           path: badges
 
-      - name: Generate JaCoCo Badge
-        id: jacoco
-        uses: cicirello/jacoco-badge-generator@v2
-        with:
-          badges-directory: badges
-          generate-branches-badge: true
-          generate-summary: true
-
-      - name: Log coverage percentage
+      - name: Generate coverage badges
+        if: github.event_name != 'pull_request'
         run: |
-          echo "coverage = ${{ steps.jacoco.outputs.coverage }}"
-          echo "branch coverage = ${{ steps.jacoco.outputs.branches }}"
+          OUTPUT=$(./gradlew koverPrintCoverageDetailed --console=plain 2>&1)
 
-      - name: Packs Jacoco Reports
+          LINE_COVERAGE=$(echo "$OUTPUT" | grep "coverage =" | grep -oP '\d+\.\d+' | awk '{printf "%.0f", $1}')
+          BRANCH_COVERAGE=$(echo "$OUTPUT" | grep "branches =" | grep -oP '\d+\.\d+' | awk '{printf "%.0f", $1}')
+
+          echo "Line Coverage: $LINE_COVERAGE%"
+          echo "Branch Coverage: $BRANCH_COVERAGE%"
+
+          if [ "$LINE_COVERAGE" -ge 80 ]; then
+            LINE_COLOR="brightgreen"
+          elif [ "$LINE_COVERAGE" -ge 60 ]; then
+            LINE_COLOR="yellow"
+          else
+            LINE_COLOR="red"
+          fi
+
+          if [ "$BRANCH_COVERAGE" -ge 80 ]; then
+            BRANCH_COLOR="brightgreen"
+          elif [ "$BRANCH_COVERAGE" -ge 60 ]; then
+            BRANCH_COLOR="yellow"
+          else
+            BRANCH_COLOR="red"
+          fi
+
+          mkdir -p badges
+
+          curl -o badges/coverage.svg "https://img.shields.io/badge/line%20coverage-${LINE_COVERAGE}%25-${LINE_COLOR}"
+          curl -o badges/branch-coverage.svg "https://img.shields.io/badge/branch%20coverage-${BRANCH_COVERAGE}%25-${BRANCH_COLOR}"
+
+          echo "LINE_COVERAGE=$LINE_COVERAGE" >> $GITHUB_ENV
+          echo "BRANCH_COVERAGE=$BRANCH_COVERAGE" >> $GITHUB_ENV
+
+      - name: Commit and push coverage badges
+        if: github.event_name != 'pull_request'
         run: |
-          rm -rf badges/jacoco
-          mkdir -p badges/jacoco
-          echo "GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED" > badges/jacoco-report.csv
-          find -name 'jacoco.csv' -exec sed '1d' {} \; >> badges/jacoco-report.csv
-          tar -c `find -name jacoco.csv` `find -name jacoco.exec` `find -name jacoco.xml` | tar -C badges/jacoco -x
-
-
-      - name: Commit and push the coverage badges and summary file
-        if: ${{ github.event_name != 'pull_request' }}
-        run: |
-          echo $(ls -l)
           cd badges
           if [[ `git status --porcelain` ]]; then
-            git config --global user.name 'github-agit pctions'
+            git config --global user.name 'github-actions'
             git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add *.svg *.json jacoco-report.csv jacoco/*
-            git commit -m "coverage = ${{ steps.jacoco.outputs.coverage }} branches = ${{ steps.jacoco.outputs.branches }}" *.svg *.json jacoco-report.csv jacoco/*
+            git add coverage.svg branch-coverage.svg
+            git commit -m "Update coverage badges: line ${{ env.LINE_COVERAGE }}%, branch ${{ env.BRANCH_COVERAGE }}%"
             git push
           fi
 
+      - name: Log coverage percentage
+        run: |
+          echo "coverage = ${{ env.LINE_COVERAGE }}"
+          echo "branches = ${{ env.BRANCH_COVERAGE }}"
