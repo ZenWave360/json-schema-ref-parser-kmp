@@ -4,6 +4,8 @@
 *.war
 *.ear
 *.class
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
 
 
 # eclipse specific git ignore
@@ -44,4 +46,6 @@ local.properties
 
 specs
 .*
+!.github/
+!.github/**
 build/
