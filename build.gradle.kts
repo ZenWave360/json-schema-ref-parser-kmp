@@ -21,6 +21,7 @@ kotlin {
     }
     js(IR) {
         nodejs()
+        binaries.executable()
         useEsModules()
         compilations["main"].packageJson {
             customField("name", "@zenwave360/json-schema-ref-parser-kmp")
@@ -64,6 +65,38 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().con
 tasks.withType<JavaCompile>().configureEach {
     sourceCompatibility = "17"
     targetCompatibility = "17"
+}
+
+val nodeIntegrationTestInstall = tasks.register<Exec>("nodeIntegrationTestInstall") {
+    group = "verification"
+    description = "Install dependencies for Node.js integration tests"
+
+    dependsOn("jsProductionExecutableCompileSync", "jsPackageJson", "kotlinNodeJsSetup")
+
+    workingDir = file("nodejs-test-project")
+
+    val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+    val npmCmd = if (isWindows) "npm.cmd" else "npm"
+
+    commandLine(npmCmd, "install")
+}
+
+val nodeIntegrationTest = tasks.register<Exec>("nodeIntegrationTest") {
+    group = "verification"
+    description = "Run Node.js integration tests for the local JS package"
+
+    dependsOn("nodeIntegrationTestInstall")
+
+    workingDir = file("nodejs-test-project")
+
+    val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+    val npmCmd = if (isWindows) "npm.cmd" else "npm"
+
+    commandLine(npmCmd, "test")
+}
+
+tasks.named("check") {
+    dependsOn("nodeIntegrationTest")
 }
 
 mavenPublishing {

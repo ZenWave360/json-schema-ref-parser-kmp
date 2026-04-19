@@ -1,0 +1,12 @@
+{
+  "name": "json-schema-ref-parser-kmp-node-test-project",
+  "version": "1.0.0",
+  "description": "Node.js integration tests for the local JSON Schema Ref Parser KMP package",
+  "type": "module",
+  "scripts": {
+    "test": "node --test ref-parser.test.js"
+  },
+  "dependencies": {
+    "@zenwave360/json-schema-ref-parser-kmp": "file:../build/js/packages/json-schema-ref-parser-kmp"
+  }
+}
