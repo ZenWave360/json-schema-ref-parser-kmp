@@ -1,0 +1,28 @@
+asyncapi: '2.6.0'
+info:
+  title: Account Service
+  version: 1.0.0
+channels:
+  user/signedup:
+    subscribe:
+      operationId: user-signedup
+      message:
+        $ref: '#/components/messages/UserSignedUp'
+components:
+  messages:
+    UserSignedUp:
+      payload:
+        type: object
+        properties:
+          email:
+            $ref: '#/components/schemas/Email'
+            description: Email of the user
+          backupEmail:
+            $ref: '#/components/schemas/Email'
+            description: Backup email of the user
+  schemas:
+    Email:
+      type: string
+      enum:
+        - Google
+        - Yahoo

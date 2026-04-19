@@ -1,0 +1,25 @@
+package io.zenwave360.jsonrefparser.io
+
+import java.net.URI
+
+/**
+ * Loads schema documents from the JVM classpath.
+ * Handles the `classpath:` URI scheme.
+ */
+class ClasspathLoader(
+    private val classLoader: ClassLoader = ClasspathLoader::class.java.classLoader,
+) : DocumentLoader {
+
+    override fun canLoad(uri: String): Boolean = uri.startsWith("classpath:")
+
+    override suspend fun load(uri: String): String {
+        var normalizedUri = uri
+        if (normalizedUri.startsWith("classpath:") && !normalizedUri.startsWith("classpath:/")) {
+            normalizedUri = normalizedUri.replace("classpath:", "classpath:/")
+        }
+        val resourcePath = URI.create(normalizedUri).path.trimStart('/')
+        val stream = classLoader.getResourceAsStream(resourcePath)
+            ?: throw java.io.FileNotFoundException("Classpath resource not found: $resourcePath")
+        return stream.use { it.readBytes().toString(Charsets.UTF_8) }
+    }
+}
