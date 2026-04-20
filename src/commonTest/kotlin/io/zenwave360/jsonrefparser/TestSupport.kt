@@ -49,7 +49,11 @@ internal fun annotateResolvedRefs(schema: MutableMap<String, Any?>, resolvedRefs
     schemas.forEach { (name, value) ->
         if (value is MutableMap<*, *>) {
             @Suppress("UNCHECKED_CAST")
-            (value as MutableMap<String, Any?>).putIfAbsent("x--schema-name", name)
+            (value as MutableMap<String, Any?>).apply {
+                if (!containsKey("x--schema-name")) {
+                    this["x--schema-name"] = name
+                }
+            }
         }
     }
 }

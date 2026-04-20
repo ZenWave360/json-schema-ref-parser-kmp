@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 class TrackingAndNormalizationTest {
 
     @Test
-    fun `resolvedRefs is populated after dereference`() = runTest {
+    fun resolvedRefsIsPopulatedAfterDereference() = runTest {
         val yaml = """
             definitions:
               Foo:
@@ -28,7 +28,7 @@ class TrackingAndNormalizationTest {
     }
 
     @Test
-    fun `getOriginalRef returns the $ref for a resolved object`() = runTest {
+    fun getOriginalRefReturnsTheRefForAResolvedObject() = runTest {
         val yaml = """
             definitions:
               Foo:
@@ -47,7 +47,7 @@ class TrackingAndNormalizationTest {
     }
 
     @Test
-    fun `same $ref target appears in resolvedRefs for every occurrence`() = runTest {
+    fun sameRefTargetAppearsInResolvedRefsForEveryOccurrence() = runTest {
         val yaml = """
             definitions:
               Shared: {type: string}
@@ -63,7 +63,7 @@ class TrackingAndNormalizationTest {
     }
 
     @Test
-    fun `originalAllOfs is populated after mergeAllOf`() = runTest {
+    fun originalAllOfsIsPopulatedAfterMergeAllOf() = runTest {
         val yaml = """
             allOf:
               - type: object
@@ -81,7 +81,7 @@ class TrackingAndNormalizationTest {
     }
 
     @Test
-    fun `getOriginalAllOf returns items for a merged map`() = runTest {
+    fun getOriginalAllOfReturnsItemsForAMergedMap() = runTest {
         val yaml = """
             allOf:
               - type: object
@@ -99,17 +99,17 @@ class TrackingAndNormalizationTest {
     }
 
     @Test
-    fun `normalizeUri bare path gets file scheme`() {
+    fun normalizeUriBarePathGetsFileScheme() {
         assertTrue(RefParser.normalizeUri("/home/user/schema.yaml").startsWith("file://"))
     }
 
     @Test
-    fun `normalizeUri classpath without slash gets slash`() {
+    fun normalizeUriClasspathWithoutSlashGetsSlash() {
         assertEquals("classpath:/schemas/foo.yaml", RefParser.normalizeUri("classpath:schemas/foo.yaml"))
     }
 
     @Test
-    fun `normalizeUri already-normalized URIs are unchanged`() {
+    fun normalizeUriAlreadyNormalizedUrisAreUnchanged() {
         val uri = "file:///home/user/schema.yaml"
         assertEquals(uri, RefParser.normalizeUri(uri))
     }

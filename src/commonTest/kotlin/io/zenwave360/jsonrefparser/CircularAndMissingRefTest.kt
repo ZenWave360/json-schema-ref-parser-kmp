@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class CircularAndMissingRefTest {
 
     @Test
-    fun `circular ref with RESOLVE does not throw`() = runTest {
+    fun circularRefWithResolveDoesNotThrow() = runTest {
         val text = readTestFile("recursive/recursive-simplest.yml")
         val doc = RefParser.fromText(text, testResourceUri("recursive/recursive-simplest.yml"))
             .withOptions(RefParserOptions(onCircular = OnCircular.RESOLVE))
@@ -24,7 +24,7 @@ class CircularAndMissingRefTest {
     }
 
     @Test
-    fun `circular ref with SKIP does not throw`() = runTest {
+    fun circularRefWithSkipDoesNotThrow() = runTest {
         val text = readTestFile("recursive/recursive-simplest.yml")
         val doc = RefParser.fromText(text, testResourceUri("recursive/recursive-simplest.yml"))
             .withOptions(RefParserOptions(onCircular = OnCircular.SKIP))
@@ -37,7 +37,7 @@ class CircularAndMissingRefTest {
     }
 
     @Test
-    fun `circular ref with FAIL throws CircularReferenceException`() = runTest {
+    fun circularRefWithFailThrowsCircularReferenceException() = runTest {
         val text = readTestFile("recursive/recursive-simplest.yml")
         assertFailsWith<CircularReferenceException> {
             RefParser.fromText(text, testResourceUri("recursive/recursive-simplest.yml"))
@@ -47,7 +47,7 @@ class CircularAndMissingRefTest {
     }
 
     @Test
-    fun `missing ref with FAIL throws exception`() = runTest {
+    fun missingRefWithFailThrowsException() = runTest {
         val yaml = """
             schema:
               ${'$'}ref: 'does-not-exist.yaml'
@@ -60,7 +60,7 @@ class CircularAndMissingRefTest {
     }
 
     @Test
-    fun `missing ref with SKIP leaves $ref in place`() = runTest {
+    fun missingRefWithSkipLeavesRefInPlace() = runTest {
         val yaml = """
             schema:
               ${'$'}ref: 'does-not-exist.yaml'

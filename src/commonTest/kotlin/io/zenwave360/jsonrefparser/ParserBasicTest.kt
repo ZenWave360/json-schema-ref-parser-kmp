@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class ParserBasicTest {
 
     @Test
-    fun `parse inline YAML`() = runTest {
+    fun parseInlineYaml() = runTest {
         val yaml = """
             type: object
             properties:
@@ -26,7 +26,7 @@ class ParserBasicTest {
     }
 
     @Test
-    fun `parse JSON file via readTestFile`() = runTest {
+    fun parseJsonFileViaReadTestFile() = runTest {
         val text = readTestFile("GH-18.json")
         val doc = RefParser.fromText(text, "memory://GH-18.json").parse().getParsedDocument()
 
@@ -36,7 +36,7 @@ class ParserBasicTest {
     }
 
     @Test
-    fun `parse YAML file via readTestFile`() = runTest {
+    fun parseYamlFileViaReadTestFile() = runTest {
         val text = readTestFile("asyncapi/multiple-allOf.yml")
         val doc = RefParser.fromText(text, "memory://multiple-allOf.yml").parse().getParsedDocument()
 
@@ -45,7 +45,7 @@ class ParserBasicTest {
     }
 
     @Test
-    fun `parse AVSC file via readTestFile`() = runTest {
+    fun parseAvscFileViaReadTestFile() = runTest {
         val text = readTestFile("asyncapi/shoping-cart-avro-array/all_cart_entities.avsc")
         val doc = RefParser.fromText(text).parse().getParsedDocument()
 
@@ -54,7 +54,7 @@ class ParserBasicTest {
     }
 
     @Test
-    fun `every map node has a source location`() = runTest {
+    fun everyMapNodeHasASourceLocation() = runTest {
         val text = readTestFile("openapi/openapi-petstore.yml")
         val doc = RefParser.fromText(text).parse().getParsedDocument()
 
@@ -63,7 +63,7 @@ class ParserBasicTest {
     }
 
     @Test
-    fun `source location lines are 0-based`() = runTest {
+    fun sourceLocationLinesAreZeroBased() = runTest {
         val yaml = "type: object\ntitle: Foo"
         val doc = RefParser.fromText(yaml).parse().getParsedDocument()
 

@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 class RegressionTest {
 
     @Test
-    fun `dereference and mergeAllOf keep asyncapi output acyclic for deep scans`() = runTest {
+    fun dereferenceAndMergeAllOfKeepAsyncapiOutputAcyclicForDeepScans() = runTest {
         val text = readTestFile("asyncapi/multiple-allOf.yml")
         val doc = RefParser.fromText(text, testResourceUri("asyncapi/multiple-allOf.yml"))
             .dereference()
@@ -18,7 +18,7 @@ class RegressionTest {
     }
 
     @Test
-    fun `asyncapi javaType fixture matches sdk expectations`() = runTest {
+    fun asyncapiJavaTypeFixtureMatchesSdkExpectations() = runTest {
         val uri = testResourceUri("asyncapi/sdk-javaType/asyncapi-javaType.yml")
         val parsed = RefParser(uri).dereference().getParsedDocument()
         @Suppress("UNCHECKED_CAST")

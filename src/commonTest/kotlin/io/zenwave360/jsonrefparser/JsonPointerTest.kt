@@ -11,33 +11,33 @@ class JsonPointerTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `parse empty string returns ROOT`() {
+    fun parseEmptyStringReturnsRoot() {
         val p = JsonPointer.parse("")
         assertEquals(emptyList(), p.tokens)
         assertEquals("", p.toString())
     }
 
     @Test
-    fun `parse simple pointer`() {
+    fun parseSimplePointer() {
         val p = JsonPointer.parse("/foo/bar")
         assertEquals(listOf("foo", "bar"), p.tokens)
         assertEquals("/foo/bar", p.toString())
     }
 
     @Test
-    fun `parse pointer with tilde escapes`() {
+    fun parsePointerWithTildeEscapes() {
         val p = JsonPointer.parse("/a~1b/c~0d")
         assertEquals(listOf("a/b", "c~d"), p.tokens)
     }
 
     @Test
-    fun `parse fragment form`() {
+    fun parseFragmentForm() {
         val p = JsonPointer.parseFragment("#/components/schemas/Foo")
         assertEquals(listOf("components", "schemas", "Foo"), p.tokens)
     }
 
     @Test
-    fun `parse fragment with only hash`() {
+    fun parseFragmentWithOnlyHash() {
         val p = JsonPointer.parseFragment("#")
         assertEquals(JsonPointer.ROOT, p)
     }
@@ -47,19 +47,19 @@ class JsonPointerTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `toString round-trips parsing`() {
+    fun toStringRoundTripsParsing() {
         val input = "/components/schemas/Foo"
         assertEquals(input, JsonPointer.parse(input).toString())
     }
 
     @Test
-    fun `child with key escapes special chars`() {
+    fun childWithKeyEscapesSpecialChars() {
         val p = JsonPointer.ROOT.child("a/b").child("c~d")
         assertEquals("/a~1b/c~0d", p.toString())
     }
 
     @Test
-    fun `child with index`() {
+    fun childWithIndex() {
         val p = JsonPointer.ROOT.child("items").child(2)
         assertEquals("/items/2", p.toString())
     }
@@ -69,7 +69,7 @@ class JsonPointerTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `resolve navigates nested map`() {
+    fun resolveNavigatesNestedMap() {
         val doc = mapOf(
             "components" to mapOf(
                 "schemas" to mapOf(
@@ -82,19 +82,19 @@ class JsonPointerTest {
     }
 
     @Test
-    fun `resolve navigates list by index`() {
+    fun resolveNavigatesListByIndex() {
         val doc = mapOf("items" to listOf("a", "b", "c"))
         assertEquals("b", JsonPointer.parse("/items/1").resolve(doc))
     }
 
     @Test
-    fun `resolve returns null for missing key`() {
+    fun resolveReturnsNullForMissingKey() {
         val doc = mapOf("foo" to "bar")
         assertNull(JsonPointer.parse("/missing").resolve(doc))
     }
 
     @Test
-    fun `ROOT resolve returns document`() {
+    fun rootResolveReturnsDocument() {
         val doc = mapOf("x" to 1)
         assertEquals(doc, JsonPointer.ROOT.resolve(doc))
     }

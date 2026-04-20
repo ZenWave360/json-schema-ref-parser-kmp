@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class MergeAllOfTest {
 
     @Test
-    fun `mergeAllOf removes allOf key`() = runTest {
+    fun mergeAllOfRemovesAllOfKey() = runTest {
         val text = readTestFile("asyncapi/multiple-allOf.yml")
         val doc = RefParser.fromText(text, testResourceUri("asyncapi/multiple-allOf.yml"))
             .dereference()
@@ -24,7 +24,7 @@ class MergeAllOfTest {
     }
 
     @Test
-    fun `mergeAllOf merges properties from all allOf entries`() = runTest {
+    fun mergeAllOfMergesPropertiesFromAllEntries() = runTest {
         val text = readTestFile("asyncapi/multiple-allOf.yml")
         val doc = RefParser.fromText(text, testResourceUri("asyncapi/multiple-allOf.yml"))
             .dereference()
@@ -43,7 +43,7 @@ class MergeAllOfTest {
     }
 
     @Test
-    fun `mergeAllOf at root level`() = runTest {
+    fun mergeAllOfAtRootLevel() = runTest {
         val text = readTestFile("gh-32-mergeAllOf-root.yml")
         val doc = RefParser.fromText(text, testResourceUri("gh-32-mergeAllOf-root.yml"))
             .dereference()
@@ -55,7 +55,7 @@ class MergeAllOfTest {
     }
 
     @Test
-    fun `mergeAllOf concatenates required arrays`() = runTest {
+    fun mergeAllOfConcatenatesRequiredArrays() = runTest {
         val yaml = """
             allOf:
               - type: object

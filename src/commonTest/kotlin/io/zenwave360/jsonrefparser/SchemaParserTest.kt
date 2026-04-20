@@ -17,7 +17,7 @@ class SchemaParserTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `parse simple YAML map`() {
+    fun parseSimpleYamlMap() {
         val yaml = """
             type: object
             title: MySchema
@@ -28,7 +28,7 @@ class SchemaParserTest {
     }
 
     @Test
-    fun `parse JSON (YAML superset)`() {
+    fun parseJsonYamlSuperset() {
         val json = """{"type":"string","minLength":1}"""
         val doc = parseText(json, "file:///test.json")
         assertEquals("string", doc.map["type"])
@@ -36,7 +36,7 @@ class SchemaParserTest {
     }
 
     @Test
-    fun `parse nested map`() {
+    fun parseNestedMap() {
         val yaml = """
             components:
               schemas:
@@ -52,7 +52,7 @@ class SchemaParserTest {
     }
 
     @Test
-    fun `parse sequence`() {
+    fun parseSequence() {
         val yaml = """
             required:
               - name
@@ -64,21 +64,21 @@ class SchemaParserTest {
     }
 
     @Test
-    fun `scalar types - integer becomes Long`() {
+    fun scalarTypesIntegerBecomesLong() {
         val yaml = "count: 42"
         val doc = parseText(yaml, "file:///t.yaml")
         assertEquals(42L, doc.map["count"])
     }
 
     @Test
-    fun `scalar types - float becomes Double`() {
+    fun scalarTypesFloatBecomesDouble() {
         val yaml = "rate: 3.14"
         val doc = parseText(yaml, "file:///t.yaml")
         assertEquals(3.14, doc.map["rate"])
     }
 
     @Test
-    fun `scalar types - boolean`() {
+    fun scalarTypesBoolean() {
         val yaml = "enabled: true\ndisabled: false"
         val doc = parseText(yaml, "file:///t.yaml")
         assertEquals(true, doc.map["enabled"])
@@ -86,14 +86,14 @@ class SchemaParserTest {
     }
 
     @Test
-    fun `scalar types - null`() {
+    fun scalarTypesNull() {
         val yaml = "value: null"
         val doc = parseText(yaml, "file:///t.yaml")
         assertNull(doc.map["value"])
     }
 
     @Test
-    fun `core schema - yes and no are strings, not booleans`() {
+    fun coreSchemaYesAndNoAreStringsNotBooleans() {
         // YAML 1.2 Core Schema: only true/false are booleans
         val yaml = "a: yes\nb: no\nc: on\nd: off"
         val doc = parseText(yaml, "file:///t.yaml")
@@ -108,14 +108,14 @@ class SchemaParserTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `root node has source location`() {
+    fun rootNodeHasSourceLocation() {
         val yaml = "type: string"
         val doc = parseText(yaml, "file:///test.yaml")
         assertNotNull(doc.locations[""])   // ROOT pointer is ""
     }
 
     @Test
-    fun `every scalar node has a location entry`() {
+    fun everyScalarNodeHasALocationEntry() {
         val yaml = """
             type: object
             properties:
@@ -130,14 +130,14 @@ class SchemaParserTest {
     }
 
     @Test
-    fun `source location file matches the supplied URI`() {
+    fun sourceLocationFileMatchesTheSuppliedUri() {
         val uri = "file:///schemas/my.yaml"
         val doc = parseText("type: string", uri)
         assertTrue(doc.locations.values.all { it.file == uri })
     }
 
     @Test
-    fun `sequence item locations are indexed by number`() {
+    fun sequenceItemLocationsAreIndexedByNumber() {
         val yaml = "items:\n  - name: a\n  - name: b"
         val doc = parseText(yaml, "file:///t.yaml")
         assertNotNull(doc.locations["/items/0"])
@@ -149,7 +149,7 @@ class SchemaParserTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `avsc parses as plain JSON`() {
+    fun avscParsesAsPlainJson() {
         val avsc = """{
             "type": "record",
             "name": "CartLine",
@@ -169,21 +169,21 @@ class SchemaParserTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `resolveUri handles relative same-directory file`() {
+    fun resolveUriHandlesRelativeSameDirectoryFile() {
         val base = "file:///home/user/api/root.yaml"
         val result = SchemaRef.resolveUri(base, "./other.yaml")
         assertEquals("file:///home/user/api/other.yaml", result)
     }
 
     @Test
-    fun `resolveUri handles parent directory traversal`() {
+    fun resolveUriHandlesParentDirectoryTraversal() {
         val base = "file:///home/user/api/root.yaml"
         val result = SchemaRef.resolveUri(base, "../common/types.yaml")
         assertEquals("file:///home/user/common/types.yaml", result)
     }
 
     @Test
-    fun `resolveUri handles bare filename (no dot-prefix)`() {
+    fun resolveUriHandlesBareFilenameNoDotPrefix() {
         val base = "file:///home/user/api/root.yaml"
         // 'other.yaml' is munged to './other.yaml' by SchemaRef.parse
         val result = SchemaRef.resolveUri(base, "./other.yaml")

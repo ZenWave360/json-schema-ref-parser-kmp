@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 class DereferenceTest {
 
     @Test
-    fun `dereference resolves internal $ref`() = runTest {
+    fun dereferenceResolvesInternalRef() = runTest {
         val yaml = """
             definitions:
               Foo:
@@ -28,7 +28,7 @@ class DereferenceTest {
     }
 
     @Test
-    fun `dereference resolves $ref in asyncapi file`() = runTest {
+    fun dereferenceResolvesRefInAsyncapiFile() = runTest {
         val text = readTestFile("asyncapi/multiple-allOf.yml")
         val doc = RefParser.fromText(text, testResourceUri("asyncapi/multiple-allOf.yml"))
             .dereference()
@@ -45,7 +45,7 @@ class DereferenceTest {
     }
 
     @Test
-    fun `dereference resolves cross-file $ref (GH-36)`() = runTest {
+    fun dereferenceResolvesCrossFileRefGh36() = runTest {
         val uri = testResourceUri("GH-36/root.json")
         val doc = RefParser(uri).dereference().getParsedDocument()
 
@@ -58,7 +58,7 @@ class DereferenceTest {
     }
 
     @Test
-    fun `source location for external ref points to origin file`() = runTest {
+    fun sourceLocationForExternalRefPointsToOriginFile() = runTest {
         val uri = testResourceUri("GH-36/root.json")
         val doc = RefParser(uri).dereference().getParsedDocument()
 
@@ -69,7 +69,7 @@ class DereferenceTest {
     }
 
     @Test
-    fun `dereference multi-file AVSC schema`() = runTest {
+    fun dereferenceMultiFileAvscSchema() = runTest {
         val uri = testResourceUri("asyncapi/shoping-cart-multiple-files/shoping-cart-multiple-files.yml")
         val doc = RefParser(uri).dereference().getParsedDocument()
 
@@ -81,7 +81,7 @@ class DereferenceTest {
     }
 
     @Test
-    fun `same $ref target returns same object instance`() = runTest {
+    fun sameRefTargetReturnsSameObjectInstance() = runTest {
         val yaml = """
             definitions:
               Shared:
@@ -104,7 +104,7 @@ class DereferenceTest {
     }
 
     @Test
-    fun `ref with sibling keys merges correctly resolved wins`() = runTest {
+    fun refWithSiblingKeysMergesCorrectlyResolvedWins() = runTest {
         val yaml = """
             definitions:
               Base:

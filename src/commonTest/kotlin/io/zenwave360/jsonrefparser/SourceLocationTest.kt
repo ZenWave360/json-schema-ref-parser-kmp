@@ -25,13 +25,13 @@ class SourceLocationTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `root node always has a location`() {
+    fun rootNodeAlwaysHasALocation() {
         val doc = parseText("type: string", BASE_URI)
         assertNotNull(doc.locations[""], "root pointer '' must have a location")
     }
 
     @Test
-    fun `every top-level key has a location`() {
+    fun everyTopLevelKeyHasALocation() {
         val yaml = """
             type: object
             title: Foo
@@ -44,7 +44,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `nested map nodes all have locations`() {
+    fun nestedMapNodesAllHaveLocations() {
         val yaml = """
             components:
               schemas:
@@ -61,7 +61,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `sequence items all have locations`() {
+    fun sequenceItemsAllHaveLocations() {
         val yaml = """
             required:
               - id
@@ -76,7 +76,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `sequence of maps each item and its children have locations`() {
+    fun sequenceOfMapsEachItemAndItsChildrenHaveLocations() {
         val yaml = """
             fields:
               - name: id
@@ -94,14 +94,14 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `null-valued node has a location`() {
+    fun nullValuedNodeHasALocation() {
         val yaml = "nullable: null"
         val doc = parseText(yaml, BASE_URI)
         assertNotNull(doc.locations["/nullable"])
     }
 
     @Test
-    fun `all locations reference the supplied file URI`() {
+    fun allLocationsReferenceTheSuppliedFileUri() {
         val uri = "file:///schemas/my-schema.yaml"
         val yaml = "type: object\nproperties:\n  id:\n    type: string"
         val doc = parseText(yaml, uri)
@@ -110,7 +110,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `location count matches node count`() {
+    fun locationCountMatchesNodeCount() {
         val yaml = """
             a: 1
             b:
@@ -128,7 +128,7 @@ class SourceLocationTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `root node starts at line 0 col 0`() {
+    fun rootNodeStartsAtLineZeroColZero() {
         val doc = parseText("a: 1", BASE_URI)
         val root = doc.locations[""]!!
         assertEquals(0, root.line,   "root line should be 0")
@@ -136,7 +136,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `scalar value on first line has correct column`() {
+    fun scalarValueOnFirstLineHasCorrectColumn() {
         // "a: 1"  →  value "1" starts at col 3
         val doc = parseText("a: 1", BASE_URI)
         val loc = doc.locations["/a"]!!
@@ -145,7 +145,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `second top-level key starts on line 1`() {
+    fun secondTopLevelKeyStartsOnLineOne() {
         val yaml = "a: 1\nb: 2"
         val doc = parseText(yaml, BASE_URI)
         val loc = doc.locations["/b"]!!
@@ -154,7 +154,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `nested map value line is correct`() {
+    fun nestedMapValueLineIsCorrect() {
         // line 0: "outer:"
         // line 1: "  inner: hello"   → value "hello" starts at line 1, col 9
         val yaml = "outer:\n  inner: hello"
@@ -165,7 +165,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `end line is greater than or equal to start line`() {
+    fun endLineIsGreaterThanOrEqualToStartLine() {
         val yaml = """
             type: object
             properties:
@@ -180,7 +180,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `multi-line string value spans multiple lines`() {
+    fun multiLineStringValueSpansMultipleLines() {
         val yaml = "desc: |\n  line one\n  line two\nother: x"
         val doc = parseText(yaml, BASE_URI)
         val loc = doc.locations["/desc"]!!
@@ -194,7 +194,7 @@ class SourceLocationTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `key with forward slash is escaped in pointer`() {
+    fun keyWithForwardSlashIsEscapedInPointer() {
         // In YAML, the key "a/b" must be quoted
         val yaml = "\"a/b\": value"
         val doc = parseText(yaml, BASE_URI)
@@ -206,7 +206,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `key with tilde is escaped in pointer`() {
+    fun keyWithTildeIsEscapedInPointer() {
         val yaml = "\"a~b\": value"
         val doc = parseText(yaml, BASE_URI)
         // RFC 6901: "~" in a key is encoded as "~0"
@@ -215,7 +215,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `sequence indices form valid integer pointer tokens`() {
+    fun sequenceIndicesFormValidIntegerPointerTokens() {
         val yaml = "items:\n  - x\n  - y\n  - z"
         val doc = parseText(yaml, BASE_URI)
         for (i in 0..2) {
@@ -225,7 +225,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `deeply nested pointer is well-formed`() {
+    fun deeplyNestedPointerIsWellFormed() {
         val yaml = """
             a:
               b:
@@ -243,27 +243,27 @@ class SourceLocationTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `boolean scalar has a location`() {
+    fun booleanScalarHasALocation() {
         val doc = parseText("enabled: true\ndisabled: false", BASE_URI)
         assertNotNull(doc.locations["/enabled"])
         assertNotNull(doc.locations["/disabled"])
     }
 
     @Test
-    fun `integer scalar has a location`() {
+    fun integerScalarHasALocation() {
         val doc = parseText("count: 42", BASE_URI)
         assertNotNull(doc.locations["/count"])
         assertEquals(0, doc.locations["/count"]!!.line)
     }
 
     @Test
-    fun `float scalar has a location`() {
+    fun floatScalarHasALocation() {
         val doc = parseText("rate: 3.14", BASE_URI)
         assertNotNull(doc.locations["/rate"])
     }
 
     @Test
-    fun `flow-style map nodes have locations`() {
+    fun flowStyleMapNodesHaveLocations() {
         val yaml = "point: {x: 1, y: 2}"
         val doc = parseText(yaml, BASE_URI)
         assertNotNull(doc.locations["/point"])
@@ -272,7 +272,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `flow-style sequence nodes have locations`() {
+    fun flowStyleSequenceNodesHaveLocations() {
         val yaml = "tags: [alpha, beta, gamma]"
         val doc = parseText(yaml, BASE_URI)
         assertNotNull(doc.locations["/tags"])
@@ -286,7 +286,7 @@ class SourceLocationTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `petstore YAML every top-level key has a location`() {
+    fun petstoreYamlEveryTopLevelKeyHasALocation() {
         val text = readTestFile("openapi/openapi-petstore.yml")
         val doc = parseText(text, BASE_URI)
         // All first-level keys in an OpenAPI document
@@ -296,7 +296,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `shoping-cart schemas YAML locations populated for properties`() {
+    fun shopingCartSchemasYamlLocationsPopulatedForProperties() {
         val text = readTestFile("asyncapi/shoping-cart-multiple-files/schemas.yml")
         val doc = parseText(text, BASE_URI)
         assertNotNull(doc.locations["/components/schemas/cart.header.v1"])
@@ -307,7 +307,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `AVSC JSON file locations populated`() {
+    fun avscJsonFileLocationsPopulated() {
         val text = readTestFile("asyncapi/shoping-cart-avro-array/all_cart_entities.avsc")
         val doc = parseText(text, BASE_URI)
         assertNotNull(doc.locations[""])
@@ -315,7 +315,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `GH18 JSON file every property has a location`() {
+    fun gh18JsonFileEveryPropertyHasALocation() {
         val text = readTestFile("GH-18.json")
         val doc = parseText(text, BASE_URI)
         assertNotNull(doc.locations["/properties/lorem"])
@@ -327,7 +327,7 @@ class SourceLocationTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `after dereference external nodes carry origin file URI`() = runTest {
+    fun afterDereferenceExternalNodesCarryOriginFileUri() = runTest {
         val rootUri = testResourceUri("GH-36/root.json")
         val commonUri = testResourceUri("GH-36/common.schema.json")
 
@@ -345,7 +345,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `after dereference inline nodes still have root file URI`() = runTest {
+    fun afterDereferenceInlineNodesStillHaveRootFileUri() = runTest {
         val rootUri = testResourceUri("GH-36/root.json")
         val doc = RefParser(rootUri).dereference().getParsedDocument()
 
@@ -356,7 +356,7 @@ class SourceLocationTest {
     }
 
     @Test
-    fun `multi-file AVSC each file has distinct origin URI in locations`() = runTest {
+    fun multiFileAvscEachFileHasDistinctOriginUriInLocations() = runTest {
         val rootUri = testResourceUri("asyncapi/shoping-cart-multiple-files/shoping-cart-multiple-files.yml")
         val doc = RefParser(rootUri).dereference().getParsedDocument()
 
@@ -372,7 +372,7 @@ class SourceLocationTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `locations still present after mergeAllOf`() = runTest {
+    fun locationsStillPresentAfterMergeAllOf() = runTest {
         val text = readTestFile("asyncapi/multiple-allOf.yml")
         val doc = RefParser.fromText(text, testResourceUri("asyncapi/multiple-allOf.yml"))
             .dereference()
