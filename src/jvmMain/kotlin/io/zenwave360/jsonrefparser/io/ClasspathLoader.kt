@@ -7,7 +7,7 @@ import java.net.URI
  * Handles the `classpath:` URI scheme.
  */
 class ClasspathLoader(
-    private val classLoader: ClassLoader = ClasspathLoader::class.java.classLoader,
+    private val classLoader: ClassLoader? = null,
 ) : DocumentLoader {
 
     override fun canLoad(uri: String): Boolean = uri.startsWith("classpath:")
@@ -18,8 +18,18 @@ class ClasspathLoader(
             normalizedUri = normalizedUri.replace("classpath:", "classpath:/")
         }
         val resourcePath = URI.create(normalizedUri).path.trimStart('/')
-        val stream = classLoader.getResourceAsStream(resourcePath)
+        val stream = candidateClassLoaders()
+            .asSequence()
+            .mapNotNull { it.getResourceAsStream(resourcePath) }
+            .firstOrNull()
             ?: throw java.io.FileNotFoundException("Classpath resource not found: $resourcePath")
         return stream.use { it.readBytes().toString(Charsets.UTF_8) }
     }
+
+    private fun candidateClassLoaders(): List<ClassLoader> = buildList {
+        classLoader?.let(::add)
+        Thread.currentThread().contextClassLoader?.let(::add)
+        ClasspathLoader::class.java.classLoader?.let(::add)
+        ClassLoader.getSystemClassLoader()?.let(::add)
+    }.distinct()
 }

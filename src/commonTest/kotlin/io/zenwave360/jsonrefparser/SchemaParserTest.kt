@@ -189,4 +189,11 @@ class SchemaParserTest {
         val result = SchemaRef.resolveUri(base, "./other.yaml")
         assertEquals("file:///home/user/api/other.yaml", result)
     }
+
+    @Test
+    fun resolveUriHandlesClasspathParentDirectoryTraversal() {
+        val base = "classpath:/retail-domain-catalog/merchandising/inventory/inventory-adjustment/asyncapi.yml"
+        val result = SchemaRef.resolveUri(base, "../../../master/kafka-bindings.yml")
+        assertEquals("classpath:/retail-domain-catalog/master/kafka-bindings.yml", result)
+    }
 }

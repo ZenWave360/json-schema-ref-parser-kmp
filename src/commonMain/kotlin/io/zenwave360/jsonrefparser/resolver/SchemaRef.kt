@@ -108,6 +108,13 @@ internal data class SchemaRef(
             val normalizedBase = base.replace('\\', '/')
             val normalizedRel = relative.replace('\\', '/')
 
+            if (normalizedBase.startsWith("classpath:")) {
+                val basePath = normalizedBase.removePrefix("classpath:")
+                val baseDir = basePath.substringBeforeLast("/") + "/"
+                val combinedPath = if (normalizedRel.startsWith("/")) normalizedRel else baseDir + normalizedRel
+                return "classpath:" + normalizePath(combinedPath)
+            }
+
             val baseDir = normalizedBase.substringBeforeLast("/") + "/"
             val combined = if (normalizedRel.startsWith("/")) normalizedRel else baseDir + normalizedRel
 
@@ -116,11 +123,26 @@ internal data class SchemaRef(
             for (part in parts) {
                 when (part) {
                     "."  -> { /* skip */ }
-                    ".." -> if (result.size > 3) result.removeLast() // don't go above scheme+authority
+                    ".." -> if (result.size > 3) result.removeAt(result.lastIndex) // don't go above scheme+authority
                     else -> result.add(part)
                 }
             }
             return result.joinToString("/")
+        }
+
+        private fun normalizePath(path: String): String {
+            val absolute = path.startsWith("/")
+            val result = mutableListOf<String>()
+
+            path.split("/").forEach { part ->
+                when (part) {
+                    "", "." -> Unit
+                    ".." -> if (result.isNotEmpty()) result.removeAt(result.lastIndex)
+                    else -> result.add(part)
+                }
+            }
+
+            return if (absolute) "/${result.joinToString("/")}" else result.joinToString("/")
         }
     }
 }

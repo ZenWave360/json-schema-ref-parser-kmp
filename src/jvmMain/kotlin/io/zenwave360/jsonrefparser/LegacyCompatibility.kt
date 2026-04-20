@@ -211,12 +211,33 @@ class `$Refs`(
             val refsByObject = IdentityHashMap<Any, `$Ref`>()
             document.resolvedRefs.forEach { resolvedRef ->
                 val ref = `$Ref`(resolvedRef.refString, resolvedRef.targetUri ?: resolvedRef.refString)
-                originalRefs.add(AbstractMap.SimpleEntry(ref, resolvedRef.resolvedTo))
-                replacedRefs.add(AbstractMap.SimpleEntry(ref, resolvedRef.replacedValue))
                 resolvedRef.resolvedTo?.let { refsByObject[it] = ref }
                 resolvedRef.replacedValue?.let { refsByObject[it] = ref }
+                if (shouldExposeInRefLists(ref, resolvedRef)) {
+                    originalRefs.add(AbstractMap.SimpleEntry(ref, resolvedRef.resolvedTo))
+                    replacedRefs.add(AbstractMap.SimpleEntry(ref, resolvedRef.replacedValue))
+                }
             }
             return `$Refs`(root, document.schema, document.locations, document.documentLocations, originalRefs, replacedRefs, refsByObject, document.hasCircularRefs)
+        }
+
+        /**
+         * Keep `getOriginalRef(value)` rich for compatibility, but avoid exposing
+         * low-level AsyncAPI trait/binding helper refs in the public ref lists.
+         *
+         * Older JVM consumers such as zenwave-sdk expect `getOriginalRefsList()`
+         * to mainly contain schema/message/channel-like refs they can annotate,
+         * and they iterate the returned values assuming map entries are nested
+         * objects rather than internal metadata helpers.
+         */
+        private fun shouldExposeInRefLists(ref: `$Ref`, resolvedRef: ResolvedRef): Boolean {
+            val value = ref.getRef()
+            val sourcePointer = resolvedRef.sourcePointer.orEmpty()
+            return !sourcePointer.contains("/traits/") &&
+                !value.contains("/components/messageTraits/") &&
+                !value.contains("/components/operationTraits/") &&
+                !value.contains("/components/channelBindings/") &&
+                !value.contains("/components/x-error-topics/")
         }
 
         private fun jsonPathToPointer(jsonPath: String): String? {

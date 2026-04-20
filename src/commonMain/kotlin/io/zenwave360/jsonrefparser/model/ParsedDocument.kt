@@ -30,6 +30,10 @@ data class ResolvedRef(
     val replacedValue: Any? = resolvedTo,
     /** Absolute target file URI when the ref points to an external document. */
     val targetUri: String? = null,
+    /** URI of the document that contained the original `$ref`. */
+    val sourceUri: String? = null,
+    /** JSON Pointer of the original `$ref` usage site within [sourceUri]. */
+    val sourcePointer: String? = null,
 )
 
 /**

@@ -197,6 +197,8 @@ private suspend fun resolveRef(
                 resolvedTo = cached,
                 replacedValue = replaced,
                 targetUri = schemaRef.fileUri,
+                sourceUri = fileUri,
+                sourcePointer = pointer,
             ),
         )
         return replaced
@@ -227,6 +229,8 @@ private suspend fun resolveRef(
             resolvedTo = fullyResolved,
             replacedValue = replaced,
             targetUri = schemaRef.fileUri,
+            sourceUri = fileUri,
+            sourcePointer = pointer,
         ),
     )
 
@@ -257,7 +261,7 @@ internal class IdentityStack {
     private val stack = mutableListOf<Any?>()
     fun contains(obj: Any?): Boolean = stack.any { it === obj }
     fun push(obj: Any?) { stack.add(obj) }
-    fun pop() { if (stack.isNotEmpty()) stack.removeLast() }
+    fun pop() { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }
 }
 
 /**
