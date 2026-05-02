@@ -338,6 +338,12 @@ class `$RefParser`(
         return this
     }
 
+    fun withAuthenticationValues(vararg authentication: AuthenticationValue): `$RefParser` =
+        withAuthentication(*authentication)
+
+    fun withAuthenticationValues(authentication: List<*>): `$RefParser` =
+        withAuthentication(authentication)
+
     private fun getOrCreateCoreParser(): RefParser =
         coreParser ?: RefParser(normalizedCompatibilityUri(), compatibilityOptions.toCore(), authentication, buildLoaders())
             .also { coreParser = it }
