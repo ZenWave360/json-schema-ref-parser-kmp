@@ -1,14 +1,22 @@
-name: Publish Release to Maven Central and NPM
+name: Publish Release to Maven Central
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Tag to check out'
+      gitRef:
+        description: 'Git ref to publish (tag or branch)'
         required: true
         default: 'main'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-maven-central-${{ inputs.gitRef || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -17,27 +25,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.event.release.tag_name || github.ref }}
+          ref: ${{ inputs.gitRef || github.ref }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: 'gradle'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Cache Gradle packages
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -45,26 +45,19 @@ jobs:
       - name: Build and test
         run: ./gradlew build
 
-      - name: Publish to Maven Central
-        run: ./gradlew publishAllPublicationsToMavenCentralRepository
+      - name: Publish and release to Maven Central
+        run: ./gradlew publishAndReleaseToMavenCentral
         env:
-          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_USERNAME }}
-          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_TOKEN }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGN_KEY }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGN_KEY_PASS }}
-
-      # - name: Publish JS package to npm
-      #   run: |
-      #     cd build/js/packages/json-schema-ref-parser-kmp
-      #     npm publish
-      #   env:
-      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_PORTAL_USERNAME || secrets.CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PORTAL_TOKEN || secrets.CENTRAL_TOKEN }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.MAVEN_GPG_PRIVATE_KEY || secrets.SIGN_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.MAVEN_GPG_PASSPHRASE || secrets.SIGN_KEY_PASS }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: build-artifacts
+          name: maven-central-build-artifacts
           path: |
             build/libs/
             build/js/packages/

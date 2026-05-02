@@ -40,7 +40,7 @@ jobs:
 
       - name: Print coverage to console
         id: coverage
-        run: ./gradlew koverPrintCoverageDetailed
+        run: ./gradlew koverPrintCoverage --console=plain
         if: always()
 
       - name: Upload coverage reports
@@ -62,13 +62,11 @@ jobs:
       - name: Generate coverage badges
         if: github.event_name != 'pull_request'
         run: |
-          OUTPUT=$(./gradlew koverPrintCoverageDetailed --console=plain 2>&1)
+          OUTPUT=$(./gradlew koverPrintCoverage --console=plain 2>&1)
 
-          LINE_COVERAGE=$(echo "$OUTPUT" | grep "coverage =" | grep -oP '\d+\.\d+' | awk '{printf "%.0f", $1}')
-          BRANCH_COVERAGE=$(echo "$OUTPUT" | grep "branches =" | grep -oP '\d+\.\d+' | awk '{printf "%.0f", $1}')
+          LINE_COVERAGE=$(echo "$OUTPUT" | grep "application line coverage:" | grep -oP '\d+\.\d+' | awk '{printf "%.0f", $1}')
 
           echo "Line Coverage: $LINE_COVERAGE%"
-          echo "Branch Coverage: $BRANCH_COVERAGE%"
 
           if [ "$LINE_COVERAGE" -ge 80 ]; then
             LINE_COLOR="brightgreen"
@@ -78,21 +76,11 @@ jobs:
             LINE_COLOR="red"
           fi
 
-          if [ "$BRANCH_COVERAGE" -ge 80 ]; then
-            BRANCH_COLOR="brightgreen"
-          elif [ "$BRANCH_COVERAGE" -ge 60 ]; then
-            BRANCH_COLOR="yellow"
-          else
-            BRANCH_COLOR="red"
-          fi
-
           mkdir -p badges
 
           curl -o badges/coverage.svg "https://img.shields.io/badge/line%20coverage-${LINE_COVERAGE}%25-${LINE_COLOR}"
-          curl -o badges/branch-coverage.svg "https://img.shields.io/badge/branch%20coverage-${BRANCH_COVERAGE}%25-${BRANCH_COLOR}"
 
           echo "LINE_COVERAGE=$LINE_COVERAGE" >> $GITHUB_ENV
-          echo "BRANCH_COVERAGE=$BRANCH_COVERAGE" >> $GITHUB_ENV
 
       - name: Commit and push coverage badges
         if: github.event_name != 'pull_request'
@@ -101,12 +89,11 @@ jobs:
           if [[ `git status --porcelain` ]]; then
             git config --global user.name 'github-actions'
             git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add coverage.svg branch-coverage.svg
-            git commit -m "Update coverage badges: line ${{ env.LINE_COVERAGE }}%, branch ${{ env.BRANCH_COVERAGE }}%"
+            git add coverage.svg
+            git commit -m "Update coverage badge: line ${{ env.LINE_COVERAGE }}%"
             git push
           fi
 
       - name: Log coverage percentage
         run: |
           echo "coverage = ${{ env.LINE_COVERAGE }}"
-          echo "branches = ${{ env.BRANCH_COVERAGE }}"

@@ -2,7 +2,7 @@ JSON Schema $Ref Parser for Kotlin Multiplatform
 =================================================
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.zenwave360.jsonrefparser/json-schema-ref-parser-kmp.svg?label=Maven%20Central&logo=apachemaven)](https://search.maven.org/artifact/io.zenwave360.jsonrefparser/json-schema-ref-parser-kmp)
-[![build](https://github.com/ZenWave360/json-schema-ref-parser-kmp/workflows/build/badge.svg)](https://github.com/ZenWave360/json-schema-ref-parser-kmp/actions)
+[![build](https://github.com/ZenWave360/json-schema-ref-parser-kmp/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/ZenWave360/json-schema-ref-parser-kmp/actions/workflows/main.yml)
 [![GitHub](https://img.shields.io/github/license/ZenWave360/json-schema-ref-parser-kmp)](https://github.com/ZenWave360/json-schema-ref-parser-kmp/blob/main/LICENSE)
 
 Parse, resolve, and dereference JSON Schema `$ref` pointers on the JVM and Node.js.
@@ -193,6 +193,10 @@ dependencies {
   <version>${json-schema-ref-parser-kmp-jvm.version}</version>
 </dependency>
 ```
+
+## Release
+
+Maven Central publishing is handled by GitHub Actions. Repository prerequisites and the release sequence are documented in [RELEASING.md](RELEASING.md).
 
 ## License
 
