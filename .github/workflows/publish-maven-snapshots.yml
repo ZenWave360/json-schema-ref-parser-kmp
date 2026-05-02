@@ -1,8 +1,8 @@
 name: Build and Publish Snapshots
 
 on:
-  # push:
-  #   branches: [ develop, next ]
+  push:
+    branches: [ develop, next ]
   workflow_dispatch:
 
 permissions:
