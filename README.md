@@ -7,7 +7,20 @@ JSON Schema $Ref Parser for JVM and Node.js
 
 Parse, resolve, and dereference JSON Schema `$ref` pointers on the JVM and Node.js.
 
-Inspired by the excellent Node.js [JSON Schema $Ref Parser](https://apidevtools.com/json-schema-ref-parser/) and its Java port [json-schema-ref-parser-jvm](https://github.com/ZenWave360/json-schema-ref-parser-jvm), this library brings `$ref` parsing and dereferencing to the JVM and Node.js with a Kotlin Multiplatform core, a modern Kotlin API, Java compatibility wrappers, and JS exports for Node runtimes.
+This library is the Kotlin Multiplatform evolution of [json-schema-ref-parser-jvm](https://github.com/ZenWave360/json-schema-ref-parser-jvm) and the recommended starting point for new JVM and Node.js integrations. Inspired by the excellent Node.js [JSON Schema $Ref Parser](https://apidevtools.com/json-schema-ref-parser/), it provides a Kotlin Multiplatform core, a modern Kotlin API, a JVM compatibility layer for existing users, and JS exports for Node runtimes.
+
+## Project Status
+
+This is the evolution of `json-schema-ref-parser-jvm` and the library to choose for new integrations on the JVM or Node.js.
+
+- New users should start with `json-schema-ref-parser-kmp`.
+- Existing `json-schema-ref-parser-jvm` users can migrate incrementally using the JVM compatibility layer, which keeps the familiar `$RefParser` and `$Refs` API shape.
+
+Current status:
+
+- The Kotlin Multiplatform core is working and is intended to match the JVM implementation behavior.
+- The main API has been reshaped to feel more natural on Kotlin/JVM and Node.js.
+- Circular reference handling has been reworked in the new implementation, but still needs broader real-world validation before this project should be considered fully settled.
 
 ## The Problem
 
@@ -88,13 +101,13 @@ The Node.js API is available from the JS target exports:
 - `dereferenceSchema(uri, mergeAllOf?)`
 - `dereferenceSchemaText(input, baseUri?, mergeAllOf?)`
 
-The npm package name is `@zenwave360/json-schema-ref-parser-kmp`. If you are opening the repository before npm publishing is enabled, use the exported API as the reference surface and defer package installation until the npm release is available.
+The npm package name is `@zenwave360/json-schema-ref-parser-kmp`. npm publishing is not enabled yet, so for now this repository publishes Maven Central artifacts only. Use the exported Node.js API as the reference surface until npm distribution is enabled.
 
 ## Usage
 
 ### Java on the JVM
 
-For Java callers, the compatibility API mirrors the shape of `json-schema-ref-parser-jvm`.
+For Java callers, the compatibility API mirrors the shape of `json-schema-ref-parser-jvm`, which makes this the preferred migration path for existing JVM users.
 
 ```java
 File file = new File("src/main/resources/openapi.yml");

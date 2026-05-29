@@ -19,12 +19,12 @@ Before the first public release, make sure all of the following are in place:
 3. A GPG keypair exists for artifact signing and the public key has been published.
 4. GitHub Actions secrets are configured.
 
-Supported secret names:
+Supported secret names used by the current GitHub workflows:
 
-- `CENTRAL_PORTAL_USERNAME` or `CENTRAL_USERNAME`
-- `CENTRAL_PORTAL_TOKEN` or `CENTRAL_TOKEN`
-- `MAVEN_GPG_PRIVATE_KEY` or `SIGN_KEY`
-- `MAVEN_GPG_PASSPHRASE` or `SIGN_KEY_PASS`
+- `CENTRAL_USERNAME`
+- `CENTRAL_TOKEN`
+- `SIGN_KEY`
+- `SIGN_KEY_PASS`
 
 ## Release Flow
 
@@ -38,8 +38,8 @@ There are two workflows involved:
 ## Manual Release Steps
 
 1. Run the `Create Gradle Release` workflow with:
-   - `releaseVersion`, for example `1.0.0`
-   - `developmentVersion`, for example `1.0.1-SNAPSHOT`
+   - `releaseVersion`, for example `0.9.20`
+   - `developmentVersion`, for example `1.0.0-SNAPSHOT`
 2. Verify that tag `v<releaseVersion>` was pushed.
 3. Watch the `Publish Release to Maven Central` workflow.
 4. After Central Portal validation and release complete, wait for Maven Central indexing.
