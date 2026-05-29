@@ -36,12 +36,41 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build and test with coverage
-        run: ./gradlew build koverHtmlReport koverLog
+        run: ./gradlew build koverHtmlReport koverXmlReport koverLog
+
+      - name: Extract coverage metrics
+        if: always()
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          report = Path("build/reports/kover/report.xml")
+          root = ET.parse(report).getroot()
+
+          metrics = {}
+          for counter in root.findall("counter"):
+              counter_type = counter.attrib["type"]
+              missed = int(counter.attrib["missed"])
+              covered = int(counter.attrib["covered"])
+              total = covered + missed
+              percent = 100.0 * covered / total if total else 0.0
+              metrics[counter_type] = round(percent)
+
+          github_env = Path(os.environ["GITHUB_ENV"])
+          with github_env.open("a", encoding="utf-8") as env:
+              env.write(f"LINE_COVERAGE={metrics.get('LINE', 0)}\n")
+              env.write(f"BRANCH_COVERAGE={metrics.get('BRANCH', 0)}\n")
+          PY
 
       - name: Print coverage to console
-        id: coverage
-        run: ./gradlew koverPrintCoverage --console=plain
         if: always()
+        run: |
+          echo "line coverage = ${LINE_COVERAGE}%"
+          echo "branch coverage = ${BRANCH_COVERAGE}%"
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
@@ -62,25 +91,31 @@ jobs:
       - name: Generate coverage badges
         if: github.event_name != 'pull_request'
         run: |
-          OUTPUT=$(./gradlew koverPrintCoverage --console=plain 2>&1)
+          set -euo pipefail
 
-          LINE_COVERAGE=$(echo "$OUTPUT" | grep "application line coverage:" | grep -oP '\d+\.\d+' | awk '{printf "%.0f", $1}')
+          echo "Line Coverage: ${LINE_COVERAGE}%"
+          echo "Branch Coverage: ${BRANCH_COVERAGE}%"
 
-          echo "Line Coverage: $LINE_COVERAGE%"
-
-          if [ "$LINE_COVERAGE" -ge 80 ]; then
+          if [ "${LINE_COVERAGE}" -ge 80 ]; then
             LINE_COLOR="brightgreen"
-          elif [ "$LINE_COVERAGE" -ge 60 ]; then
+          elif [ "${LINE_COVERAGE}" -ge 60 ]; then
             LINE_COLOR="yellow"
           else
             LINE_COLOR="red"
           fi
 
+          if [ "${BRANCH_COVERAGE}" -ge 80 ]; then
+            BRANCH_COLOR="brightgreen"
+          elif [ "${BRANCH_COVERAGE}" -ge 60 ]; then
+            BRANCH_COLOR="yellow"
+          else
+            BRANCH_COLOR="red"
+          fi
+
           mkdir -p badges
 
-          curl -o badges/coverage.svg "https://img.shields.io/badge/line%20coverage-${LINE_COVERAGE}%25-${LINE_COLOR}"
-
-          echo "LINE_COVERAGE=$LINE_COVERAGE" >> $GITHUB_ENV
+          curl -fsSL -o badges/coverage.svg "https://img.shields.io/badge/line%20coverage-${LINE_COVERAGE}%25-${LINE_COLOR}"
+          curl -fsSL -o badges/branches.svg "https://img.shields.io/badge/branch%20coverage-${BRANCH_COVERAGE}%25-${BRANCH_COLOR}"
 
       - name: Commit and push coverage badges
         if: github.event_name != 'pull_request'
@@ -89,11 +124,12 @@ jobs:
           if [[ `git status --porcelain` ]]; then
             git config --global user.name 'github-actions'
             git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add coverage.svg
-            git commit -m "Update coverage badge: line ${{ env.LINE_COVERAGE }}%"
+            git add coverage.svg branches.svg
+            git commit -m "Update coverage badges: line ${{ env.LINE_COVERAGE }}%, branch ${{ env.BRANCH_COVERAGE }}%"
             git push
           fi
 
       - name: Log coverage percentage
         run: |
-          echo "coverage = ${{ env.LINE_COVERAGE }}"
+          echo "line coverage = ${{ env.LINE_COVERAGE }}"
+          echo "branch coverage = ${{ env.BRANCH_COVERAGE }}"

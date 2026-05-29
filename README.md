@@ -3,34 +3,41 @@ JSON Schema $Ref Parser for JVM and Node.js
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.zenwave360.jsonrefparser/json-schema-ref-parser-kmp.svg?label=Maven%20Central&logo=apachemaven)](https://search.maven.org/artifact/io.zenwave360.jsonrefparser/json-schema-ref-parser-kmp)
 [![build](https://github.com/ZenWave360/json-schema-ref-parser-kmp/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/ZenWave360/json-schema-ref-parser-kmp/actions/workflows/main.yml)
+[![line coverage](https://raw.githubusercontent.com/ZenWave360/json-schema-ref-parser-kmp/badges/coverage.svg)](https://github.com/ZenWave360/json-schema-ref-parser-kmp/actions/workflows/main.yml)
+[![branch coverage](https://raw.githubusercontent.com/ZenWave360/json-schema-ref-parser-kmp/badges/branches.svg)](https://github.com/ZenWave360/json-schema-ref-parser-kmp/actions/workflows/main.yml)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/ZenWave360/json-schema-ref-parser-kmp/blob/main/LICENSE)
 
 Parse, resolve, and dereference JSON Schema `$ref` pointers on the JVM and Node.js.
 
-This library is the Kotlin Multiplatform evolution of [json-schema-ref-parser-jvm](https://github.com/ZenWave360/json-schema-ref-parser-jvm) and the recommended starting point for new JVM and Node.js integrations. Inspired by the excellent Node.js [JSON Schema $Ref Parser](https://apidevtools.com/json-schema-ref-parser/), it provides a Kotlin Multiplatform core, a modern Kotlin API, a JVM compatibility layer for existing users, and JS exports for Node runtimes.
+This library is the Kotlin Multiplatform evolution of [json-schema-ref-parser-jvm](https://github.com/ZenWave360/json-schema-ref-parser-jvm). It provides:
+
+- `RefParser` as the primary API for Kotlin, JVM, and Node.js integrations
+- a JVM compatibility layer for existing `$RefParser` and `$Refs` users
+- JS exports for Node.js runtimes
 
 ## Project Status
 
-This is the evolution of `json-schema-ref-parser-jvm` and the library to choose for new integrations on the JVM or Node.js.
+This is the library to choose for new JVM and Node.js integrations.
 
 - New users should start with `json-schema-ref-parser-kmp`.
-- Existing `json-schema-ref-parser-jvm` users can migrate incrementally using the JVM compatibility layer, which keeps the familiar `$RefParser` and `$Refs` API shape.
+- Existing `json-schema-ref-parser-jvm` users can migrate incrementally using the JVM compatibility layer.
+- The `$RefParser` API remains available on the JVM for compatibility, but it is not the primary API going forward.
 
 Current status:
 
 - The Kotlin Multiplatform core is working and is intended to match the JVM implementation behavior.
-- The main API has been reshaped to feel more natural on Kotlin/JVM and Node.js.
-- Circular reference handling has been reworked in the new implementation, but still needs broader real-world validation before this project should be considered fully settled.
+- The main API has been reshaped around `RefParser`.
+- Circular reference handling has been reworked in the new implementation and still benefits from broader real-world validation.
 
 ## The Problem
 
-If you work with JSON Schema, OpenAPI, or AsyncAPI specifications you know the pain: schemas spread across multiple files, `$ref` pointers everywhere, and you end up writing yet another ad hoc parser. This library handles all of that for you.
+If you work with JSON Schema, OpenAPI, or AsyncAPI specifications, you know the pain: schemas spread across multiple files, `$ref` pointers everywhere, and yet another ad hoc parser seems inevitable.
 
-It is a full [JSON Reference](https://tools.ietf.org/html/draft-pbryan-zyp-json-ref-03) and [JSON Pointer](https://tools.ietf.org/html/rfc6901) implementation that crawls even the most complex schemas and returns a simple `Map` of nodes.
+This library handles all of that for you. It is a full [JSON Reference](https://tools.ietf.org/html/draft-pbryan-zyp-json-ref-03) and [JSON Pointer](https://tools.ietf.org/html/rfc6901) implementation that crawls even complex schemas and returns a simple object tree with source locations and resolved ref tracking.
 
 ## Quick Start
 
-### Kotlin
+### Kotlin with `RefParser`
 
 ```kotlin
 val doc = RefParser("path/to/openapi.yml")
@@ -41,17 +48,35 @@ val doc = RefParser("path/to/openapi.yml")
 val schema: Map<String, Any?> = doc.schema
 ```
 
-### Java
+### Java with `RefParser`
+
+For Java callers, `RefParser` is still the primary API, but the pipeline is suspend-first. On the JVM, use the blocking helper functions.
 
 ```java
+import static io.zenwave360.jsonrefparser.RefParserBlockingKt.dereferenceBlocking;
+import static io.zenwave360.jsonrefparser.RefParserBlockingKt.mergeAllOfBlocking;
+import static io.zenwave360.jsonrefparser.io.DefaultLoadersKt.defaultLoaders;
+
+import io.zenwave360.jsonrefparser.RefParser;
+import io.zenwave360.jsonrefparser.model.OnCircular;
+import io.zenwave360.jsonrefparser.model.OnMissing;
+import io.zenwave360.jsonrefparser.model.ParsedDocument;
+import io.zenwave360.jsonrefparser.model.RefParserOptions;
+import java.io.File;
+import java.util.Collections;
+import java.util.Map;
+
 File file = new File("src/main/resources/openapi.yml");
 
-$Refs refs = new $RefParser(file)
-        .dereference()
-        .mergeAllOf()
-        .getRefs();
+RefParser parser = new RefParser(
+        file.toURI().toString(),
+        new RefParserOptions(OnCircular.SKIP, OnMissing.FAIL),
+        Collections.emptyList(),
+        defaultLoaders(Collections.emptyList())
+);
 
-Object schema = refs.schema();
+ParsedDocument doc = mergeAllOfBlocking(dereferenceBlocking(parser)).getParsedDocument();
+Map<String, Object> schema = (Map<String, Object>) doc.getSchema();
 ```
 
 ### Node.js
@@ -101,29 +126,13 @@ The Node.js API is available from the JS target exports:
 - `dereferenceSchema(uri, mergeAllOf?)`
 - `dereferenceSchemaText(input, baseUri?, mergeAllOf?)`
 
-The npm package name is `@zenwave360/json-schema-ref-parser-kmp`. npm publishing is not enabled yet, so for now this repository publishes Maven Central artifacts only. Use the exported Node.js API as the reference surface until npm distribution is enabled.
+The npm package name is `@zenwave360/json-schema-ref-parser-kmp`. npm publishing is not enabled yet, so this repository currently publishes Maven Central artifacts only.
 
 ## Usage
 
-### Java on the JVM
+### `RefParser` Primary API
 
-For Java callers, the compatibility API mirrors the shape of `json-schema-ref-parser-jvm`, which makes this the preferred migration path for existing JVM users.
-
-```java
-File file = new File("src/main/resources/openapi.yml");
-
-$Refs refs = new $RefParser(file)
-        .withOptions(new $RefParserOptions().withOnCircular(SKIP))
-        .dereference()
-        .mergeAllOf()
-        .getRefs();
-
-Object schema = refs.schema();
-```
-
-### Kotlin on the JVM or Multiplatform
-
-The primary API is the Kotlin `RefParser`.
+`RefParser` is the main API for Kotlin Multiplatform, Kotlin/JVM, and new JVM integrations.
 
 ### Dereference
 
@@ -135,9 +144,9 @@ val doc = RefParser("path/to/schema.yml")
     .getParsedDocument()
 ```
 
-### Merge allOf
+### Merge `allOf`
 
-After dereferencing, merges every `allOf` array into its parent object, combining `properties` and `required` fields.
+After dereferencing, merges every `allOf` array into its parent object, combining fields such as `properties` and `required`.
 
 ```kotlin
 val doc = RefParser("path/to/schema.yml")
@@ -148,7 +157,7 @@ val doc = RefParser("path/to/schema.yml")
 
 ### Circular references
 
-By default circular references are resolved (the cycle is left in place as a shared object). You can also skip them or fail hard.
+By default, circular references are resolved by preserving object identity. You can also skip them or fail fast.
 
 ```kotlin
 val doc = RefParser(
@@ -175,15 +184,15 @@ val doc = RefParser(
     uri = "path/to/schema.yml",
     auth = listOf(
         AuthenticationValue(
-            headerName = "Authorization",
-            headerValue = "Bearer <token>",
+            key = "Authorization",
+            value = "Bearer <token>",
             urlMatcher = { url -> url.contains("api.example.com") },
         )
     ),
 ).dereference().getParsedDocument()
 ```
 
-### Classpath loading (JVM)
+### Classpath loading on the JVM
 
 ```kotlin
 val doc = RefParser("classpath:/schemas/openapi.yml")
@@ -193,7 +202,7 @@ val doc = RefParser("classpath:/schemas/openapi.yml")
 
 ### Source locations
 
-Every node in the parsed document carries its original file and line/column range, even after dereferencing across multiple files. Useful for error reporting and IDE tooling.
+Every node in the parsed document carries its original file and line and column range, even after dereferencing across multiple files.
 
 ```kotlin
 val doc = RefParser("path/to/schema.yml")
@@ -206,7 +215,7 @@ println("${location?.file}:${location?.line}:${location?.column}")
 
 ### Original ref tracking
 
-After dereferencing you can look up which `$ref` string a given object came from.
+After dereferencing, you can look up which `$ref` string a given object came from.
 
 ```kotlin
 val doc = RefParser("path/to/schema.yml")
@@ -232,9 +241,83 @@ val yaml = """
 val doc = RefParser.fromText(yaml).dereference().getParsedDocument()
 ```
 
+### Java on the JVM
+
+Java callers can use the same `RefParser` model, plus the JVM blocking helpers:
+
+```java
+import static io.zenwave360.jsonrefparser.RefParserBlockingKt.dereferenceBlocking;
+import static io.zenwave360.jsonrefparser.RefParserBlockingKt.mergeAllOfBlocking;
+import static io.zenwave360.jsonrefparser.io.DefaultLoadersKt.defaultLoaders;
+
+import io.zenwave360.jsonrefparser.RefParser;
+import io.zenwave360.jsonrefparser.model.OnCircular;
+import io.zenwave360.jsonrefparser.model.OnMissing;
+import io.zenwave360.jsonrefparser.model.ParsedDocument;
+import io.zenwave360.jsonrefparser.model.RefParserOptions;
+import java.io.File;
+import java.util.Collections;
+
+File file = new File("src/main/resources/openapi.yml");
+
+RefParser parser = new RefParser(
+        file.toURI().toString(),
+        new RefParserOptions(OnCircular.SKIP, OnMissing.FAIL),
+        Collections.emptyList(),
+        defaultLoaders(Collections.emptyList())
+);
+
+ParsedDocument doc = mergeAllOfBlocking(dereferenceBlocking(parser)).getParsedDocument();
+System.out.println(doc.getSchema());
+```
+
+### `$Ref` Compatibility API on the JVM
+
+The JVM module still ships the legacy compatibility API for existing `json-schema-ref-parser-jvm` users:
+
+- `$RefParser`
+- `$Refs`
+- `$Ref`
+- `$RefParserOptions`
+
+Use this when you want a low-friction migration path from the old JVM library. For new JVM code, prefer `RefParser`.
+
+```java
+import static io.zenwave360.jsonrefparser.$RefParserOptions.OnCircular.SKIP;
+
+import io.zenwave360.jsonrefparser.$RefParser;
+import io.zenwave360.jsonrefparser.$RefParserOptions;
+import io.zenwave360.jsonrefparser.$Refs;
+import java.io.File;
+
+File file = new File("src/main/resources/openapi.yml");
+
+$Refs refs = new $RefParser(file)
+        .withOptions(new $RefParserOptions().withOnCircular(SKIP))
+        .dereference()
+        .mergeAllOf()
+        .getRefs();
+
+Object schema = refs.schema();
+```
+
+### Source locations with `$Refs`
+
+```java
+import io.zenwave360.jsonrefparser.$RefParser;
+import java.io.File;
+
+File file = new File("src/main/resources/openapi.yml");
+
+var range = new $RefParser(file)
+        .parse()
+        .getRefs()
+        .getJsonLocationRange("$.info");
+```
+
 ### Node.js
 
-The JS target exports plain-object APIs designed for ESM runtimes in Node.js.
+The JS target exports plain object APIs designed for ESM runtimes in Node.js.
 
 Dereference a file:
 
@@ -280,20 +363,18 @@ console.log(doc.locations[""]);
 
 ## Features
 
-- Parses JSON, YAML, and Avro schemas (avsc), or any mix of them
-- Dereferences `$ref` pointers producing a plain `Map` tree
-- Cross-file references: local files, remote URLs, and classpath resources (JVM)
-- Object identity: two `$ref` pointers to the same target always resolve to the same object instance
-- Source locations: every node maps back to the file, line, and column it came from
-- Original ref tracking: look up the source `$ref` for any resolved object
+- Parses JSON, YAML, and Avro schemas, or any mix of them
+- Dereferences `$ref` pointers into a plain object tree
+- Cross-file references: local files, remote URLs, and classpath resources on the JVM
+- Object identity: two `$ref` pointers to the same target resolve to the same object instance
+- Source locations for every parsed node
+- Original ref tracking for resolved objects
 - Merges `allOf` arrays into a single object
-- Authentication headers for remote file loading
-- Circular reference detection with three modes: resolve, skip, or fail
-- Missing reference handling: skip or fail
-- Runs on the JVM and Node.js (Kotlin Multiplatform)
-- Java-friendly compatibility API for migration from `json-schema-ref-parser-jvm`
-- Node.js exports for ESM runtimes
-- Minimal dependencies: just `snakeyaml-engine-kmp` and `kotlinx-coroutines`. No Jackson, no JsonPath, no Apache Commons. No version conflicts with your existing stack.
+- Authentication headers and query parameters for remote loading
+- Circular reference detection with resolve, skip, and fail modes
+- Missing reference handling with skip and fail modes
+- JVM and Node.js support through Kotlin Multiplatform
+- JVM compatibility layer for existing `json-schema-ref-parser-jvm` users
 
 ## Release
 
