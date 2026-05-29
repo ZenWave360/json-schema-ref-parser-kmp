@@ -5,6 +5,7 @@ import io.zenwave360.jsonrefparser.model.getOriginalRef
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -44,6 +45,12 @@ class TrackingAndNormalizationTest {
         val ref = doc.getOriginalRef(resolved)
         assertNotNull(ref, "getOriginalRef should find the entry")
         assertEquals("#/definitions/Foo", ref.refString)
+    }
+
+    @Test
+    fun getOriginalRefReturnsNullWhenObjectWasNotResolvedFromARef() = runTest {
+        val doc = RefParser.fromText("type: object").parse().getParsedDocument()
+        assertNull(doc.getOriginalRef(doc.schema))
     }
 
     @Test
@@ -96,6 +103,12 @@ class TrackingAndNormalizationTest {
         val items = doc.getOriginalAllOf(doc.schema)
         assertNotNull(items, "getOriginalAllOf should find the root entry")
         assertEquals(2, items.size)
+    }
+
+    @Test
+    fun getOriginalAllOfReturnsNullForUntrackedMap() = runTest {
+        val doc = RefParser.fromText("type: object").parse().getParsedDocument()
+        assertNull(doc.getOriginalAllOf(doc.schema))
     }
 
     @Test

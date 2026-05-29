@@ -11,7 +11,8 @@ Parse, resolve, and dereference JSON Schema `$ref` pointers on the JVM and Node.
 
 This library is the Kotlin Multiplatform evolution of [json-schema-ref-parser-jvm](https://github.com/ZenWave360/json-schema-ref-parser-jvm). It provides:
 
-- `RefParser` as the primary API for Kotlin, JVM, and Node.js integrations
+- `RefParser` as the primary API for Kotlin and Node.js integrations
+- `JavaRefParser` as the blocking JVM facade for Java and Kotlin/JVM callers
 - a JVM compatibility layer for existing `$RefParser` and `$Refs` users
 - JS exports for Node.js runtimes
 
@@ -48,34 +49,23 @@ val doc = RefParser("path/to/openapi.yml")
 val schema: Map<String, Any?> = doc.schema
 ```
 
-### Java with `RefParser`
+### Java with `JavaRefParser`
 
-For Java callers, `RefParser` is still the primary API, but the pipeline is suspend-first. On the JVM, use the blocking helper functions.
+For blocking callers on the JVM, use the `JavaRefParser` facade built on top of `RefParser`.
 
 ```java
-import static io.zenwave360.jsonrefparser.RefParserBlockingKt.dereferenceBlocking;
-import static io.zenwave360.jsonrefparser.RefParserBlockingKt.mergeAllOfBlocking;
-import static io.zenwave360.jsonrefparser.io.DefaultLoadersKt.defaultLoaders;
-
-import io.zenwave360.jsonrefparser.RefParser;
-import io.zenwave360.jsonrefparser.model.OnCircular;
-import io.zenwave360.jsonrefparser.model.OnMissing;
+import io.zenwave360.jsonrefparser.JavaRefParser;
 import io.zenwave360.jsonrefparser.model.ParsedDocument;
-import io.zenwave360.jsonrefparser.model.RefParserOptions;
 import java.io.File;
-import java.util.Collections;
 import java.util.Map;
 
 File file = new File("src/main/resources/openapi.yml");
 
-RefParser parser = new RefParser(
-        file.toURI().toString(),
-        new RefParserOptions(OnCircular.SKIP, OnMissing.FAIL),
-        Collections.emptyList(),
-        defaultLoaders(Collections.emptyList())
-);
+ParsedDocument doc = JavaRefParser.from(file)
+        .dereference()
+        .mergeAllOf()
+        .getParsedDocument();
 
-ParsedDocument doc = mergeAllOfBlocking(dereferenceBlocking(parser)).getParsedDocument();
 Map<String, Object> schema = (Map<String, Object>) doc.getSchema();
 ```
 
@@ -132,7 +122,7 @@ The npm package name is `@zenwave360/json-schema-ref-parser-kmp`. npm publishing
 
 ### `RefParser` Primary API
 
-`RefParser` is the main API for Kotlin Multiplatform, Kotlin/JVM, and new JVM integrations.
+`RefParser` is the main suspend-first API for Kotlin and Node.js integrations. Blocking callers on the JVM should use `JavaRefParser`.
 
 ### Dereference
 
@@ -192,6 +182,32 @@ val doc = RefParser(
 ).dereference().getParsedDocument()
 ```
 
+### Loader configuration
+
+Replace the loader chain completely:
+
+```kotlin
+val doc = RefParser("classpath:/schemas/openapi.yml")
+    .withLoaders(
+        ClasspathLoader(pluginClassLoader),
+        FileLoader(),
+        HttpLoader(),
+    )
+    .dereference()
+    .getParsedDocument()
+```
+
+Patch only the default chain, replacing matching loader types and preserving the rest:
+
+```kotlin
+val doc = RefParser("classpath:/schemas/openapi.yml")
+    .withDefaultLoaders(
+        ClasspathLoader(pluginClassLoader),
+    )
+    .dereference()
+    .getParsedDocument()
+```
+
 ### Classpath loading on the JVM
 
 ```kotlin
@@ -243,32 +259,71 @@ val doc = RefParser.fromText(yaml).dereference().getParsedDocument()
 
 ### Java on the JVM
 
-Java callers can use the same `RefParser` model, plus the JVM blocking helpers:
+Blocking JVM callers should use the JVM facade:
 
 ```java
-import static io.zenwave360.jsonrefparser.RefParserBlockingKt.dereferenceBlocking;
-import static io.zenwave360.jsonrefparser.RefParserBlockingKt.mergeAllOfBlocking;
-import static io.zenwave360.jsonrefparser.io.DefaultLoadersKt.defaultLoaders;
-
-import io.zenwave360.jsonrefparser.RefParser;
+import io.zenwave360.jsonrefparser.JavaRefParser;
 import io.zenwave360.jsonrefparser.model.OnCircular;
 import io.zenwave360.jsonrefparser.model.OnMissing;
 import io.zenwave360.jsonrefparser.model.ParsedDocument;
 import io.zenwave360.jsonrefparser.model.RefParserOptions;
 import java.io.File;
-import java.util.Collections;
 
 File file = new File("src/main/resources/openapi.yml");
 
-RefParser parser = new RefParser(
-        file.toURI().toString(),
-        new RefParserOptions(OnCircular.SKIP, OnMissing.FAIL),
-        Collections.emptyList(),
-        defaultLoaders(Collections.emptyList())
-);
+ParsedDocument doc = JavaRefParser.from(file)
+        .withOptions(new RefParserOptions(OnCircular.SKIP, OnMissing.FAIL))
+        .dereference()
+        .mergeAllOf()
+        .getParsedDocument();
 
-ParsedDocument doc = mergeAllOfBlocking(dereferenceBlocking(parser)).getParsedDocument();
 System.out.println(doc.getSchema());
+```
+
+Patch only the default classpath loader while keeping the default file and HTTP loaders:
+
+```java
+import io.zenwave360.jsonrefparser.JavaRefParser;
+import java.net.URI;
+
+var doc = JavaRefParser.from(URI.create("classpath:catalog/service/asyncapi.yml"))
+        .withResourceClassLoader(pluginClassLoader)
+        .dereference()
+        .getParsedDocument();
+```
+
+Patch the default loader chain explicitly:
+
+```java
+import io.zenwave360.jsonrefparser.JavaRefParser;
+import io.zenwave360.jsonrefparser.io.ClasspathLoader;
+import java.util.Arrays;
+
+var doc = JavaRefParser.from("classpath:catalog/service/asyncapi.yml")
+        .withDefaultLoaders(Arrays.asList(
+                new ClasspathLoader(pluginClassLoader)
+        ))
+        .dereference()
+        .getParsedDocument();
+```
+
+Replace the loader chain completely:
+
+```java
+import io.zenwave360.jsonrefparser.JavaRefParser;
+import io.zenwave360.jsonrefparser.io.ClasspathLoader;
+import io.zenwave360.jsonrefparser.io.FileLoader;
+import io.zenwave360.jsonrefparser.io.HttpLoader;
+import java.util.Arrays;
+
+var doc = JavaRefParser.from("classpath:catalog/service/asyncapi.yml")
+        .withLoaders(Arrays.asList(
+                new ClasspathLoader(pluginClassLoader),
+                new FileLoader(),
+                new HttpLoader()
+        ))
+        .dereference()
+        .getParsedDocument();
 ```
 
 ### `$Ref` Compatibility API on the JVM
@@ -280,7 +335,7 @@ The JVM module still ships the legacy compatibility API for existing `json-schem
 - `$Ref`
 - `$RefParserOptions`
 
-Use this when you want a low-friction migration path from the old JVM library. For new JVM code, prefer `RefParser`.
+Use this when you want a low-friction migration path from the old JVM library. For new JVM code, prefer `JavaRefParser`.
 
 ```java
 import static io.zenwave360.jsonrefparser.$RefParserOptions.OnCircular.SKIP;

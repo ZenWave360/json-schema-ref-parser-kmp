@@ -1,9 +1,5 @@
 package io.zenwave360.jsonrefparser
 
-import io.zenwave360.jsonrefparser.io.ClasspathLoader
-import io.zenwave360.jsonrefparser.io.DocumentLoader
-import io.zenwave360.jsonrefparser.io.FileLoader
-import io.zenwave360.jsonrefparser.io.HttpLoader
 import io.zenwave360.jsonrefparser.model.OnCircular
 import io.zenwave360.jsonrefparser.model.OnMissing
 import io.zenwave360.jsonrefparser.model.OriginalAllOf
@@ -345,7 +341,11 @@ class `$RefParser`(
         withAuthentication(authentication)
 
     private fun getOrCreateCoreParser(): RefParser =
-        coreParser ?: RefParser(normalizedCompatibilityUri(), compatibilityOptions.toCore(), authentication, buildLoaders())
+        coreParser ?: JavaRefParser.from(normalizedCompatibilityUri())
+            .withOptions(compatibilityOptions.toCore())
+            .withAuthenticationValues(*authentication.toTypedArray())
+            .withResourceClassLoader(resourceClassLoader)
+            .toRefParser()
             .also { coreParser = it }
 
     fun parse(): `$RefParser` {
@@ -388,10 +388,4 @@ class `$RefParser`(
         document = parsed
         rootValue = parser.rawRoot ?: parsed.schema
     }
-
-    private fun buildLoaders(): List<DocumentLoader> = listOf(
-        ClasspathLoader(resourceClassLoader ?: Thread.currentThread().contextClassLoader),
-        FileLoader(),
-        HttpLoader(authentication),
-    )
 }

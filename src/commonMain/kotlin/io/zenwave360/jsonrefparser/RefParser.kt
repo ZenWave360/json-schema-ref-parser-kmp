@@ -60,6 +60,18 @@ class RefParser(
     fun withAuthentication(vararg auth: AuthenticationValue): RefParser =
         RefParser(uri, options, this.auth + auth.toList(), loaders)
 
+    fun withLoaders(vararg loaders: DocumentLoader): RefParser =
+        RefParser(uri, options, auth, loaders.toList())
+
+    fun withLoaders(loaders: List<DocumentLoader>): RefParser =
+        RefParser(uri, options, auth, loaders)
+
+    fun withDefaultLoaders(vararg loaders: DocumentLoader): RefParser =
+        RefParser(uri, options, auth, mergeDefaultLoaders(loaders.toList()))
+
+    fun withDefaultLoaders(loaders: List<DocumentLoader>): RefParser =
+        RefParser(uri, options, auth, mergeDefaultLoaders(loaders))
+
     // -----------------------------------------------------------------------
     // Pipeline steps
     // -----------------------------------------------------------------------
@@ -167,5 +179,24 @@ class RefParser(
             }
             return rawUri
         }
+    }
+
+    private fun mergeDefaultLoaders(replacements: List<DocumentLoader>): List<DocumentLoader> {
+        val seed = mutableListOf<DocumentLoader>()
+        val currentRootLoader = loaders.firstOrNull()
+        if (currentRootLoader is InMemoryLoader) {
+            seed += currentRootLoader
+        }
+        seed += defaultLoaders(auth)
+
+        replacements.forEach { replacement ->
+            val index = seed.indexOfFirst { it::class == replacement::class }
+            if (index >= 0) {
+                seed[index] = replacement
+            } else {
+                seed += replacement
+            }
+        }
+        return seed
     }
 }
