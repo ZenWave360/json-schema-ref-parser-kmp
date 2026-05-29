@@ -12,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import io.zenwave360.jsonrefparser.io.ClasspathLoader
 
 /**
  * JVM-specific tests: classpath loading and blocking extension functions.
@@ -131,6 +132,88 @@ class RefParserJvmTest {
             val avroSchema = payload["schema"] as Map<*, *>
             assertEquals("record", avroSchema["type"])
             assertEquals("Ping", avroSchema["name"])
+        }
+    }
+
+    @Test
+    fun `java ref parser loads classpath resources from injected jar classloader`() {
+        val tempRoot = Files.createTempDirectory("java-ref-parser-classpath-loader-jar-test")
+        val jarFile = tempRoot.resolve("test-resources.jar").toFile()
+
+        JarOutputStream(FileOutputStream(jarFile)).use { jar ->
+            jar.putNextEntry(JarEntry("retail-domain-catalog/service/asyncapi.yml"))
+            jar.write(
+                """
+                    asyncapi: 3.0.0
+                    info:
+                      title: JAR ClassLoader Test
+                      version: 1.0.0
+                    channels:
+                      ping:
+                        messages:
+                          Ping:
+                            payload:
+                              schema:
+                                ${'$'}ref: './avro/Ping.avsc'
+                """.trimIndent().toByteArray()
+            )
+            jar.closeEntry()
+
+            jar.putNextEntry(JarEntry("retail-domain-catalog/service/avro/Ping.avsc"))
+            jar.write(
+                """
+                    {
+                      "type": "record",
+                      "name": "Ping",
+                      "fields": [
+                        {"name": "id", "type": "string"}
+                      ]
+                    }
+                """.trimIndent().toByteArray()
+            )
+            jar.closeEntry()
+        }
+
+        URLClassLoader(arrayOf(jarFile.toURI().toURL()), null).use { projectLoader ->
+            val doc = JavaRefParser.from("classpath:retail-domain-catalog/service/asyncapi.yml")
+                .withResourceClassLoader(projectLoader)
+                .dereference()
+                .getParsedDocument()
+
+            assertEquals("3.0.0", doc.schema["asyncapi"])
+
+            val channels = doc.schema["channels"] as Map<*, *>
+            val ping = channels["ping"] as Map<*, *>
+            val messages = ping["messages"] as Map<*, *>
+            val pingMessage = messages["Ping"] as Map<*, *>
+            val payload = pingMessage["payload"] as Map<*, *>
+            val avroSchema = payload["schema"] as Map<*, *>
+            assertEquals("record", avroSchema["type"])
+            assertEquals("Ping", avroSchema["name"])
+        }
+    }
+
+    @Test
+    fun `ref parser with default loaders patches classpath loader without losing defaults`() = runTest {
+        val tempRoot = Files.createTempDirectory("ref-parser-default-loaders-classpath-loader-test")
+        val resourceDir = Files.createDirectories(tempRoot.resolve("catalog/service"))
+        Files.writeString(
+            resourceDir.resolve("asyncapi.yml"),
+            """
+                asyncapi: 2.6.0
+                info:
+                  title: Default Loaders Patch Test
+                  version: 1.0.0
+            """.trimIndent(),
+        )
+
+        URLClassLoader(arrayOf(tempRoot.toUri().toURL()), null).use { projectLoader ->
+            val doc = RefParser("classpath:catalog/service/asyncapi.yml")
+                .withDefaultLoaders(ClasspathLoader(projectLoader))
+                .parse()
+                .getParsedDocument()
+
+            assertEquals("2.6.0", doc.schema["asyncapi"])
         }
     }
 
