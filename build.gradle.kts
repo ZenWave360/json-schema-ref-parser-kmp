@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.zenwave360.jsonrefparser"
-version = "1.0.0-SNAPSHOT"
+version = "0.9.20"
 
 repositories {
     mavenCentral()
