@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     kotlin("multiplatform") version "2.0.21"
-    id("com.vanniktech.maven.publish") version "0.31.0"
+    id("com.vanniktech.maven.publish") version "0.34.0"
     id("org.jetbrains.kotlinx.kover") version "0.9.4"
 }
 
@@ -101,9 +101,17 @@ tasks.named("check") {
     dependsOn("nodeIntegrationTest")
 }
 
+val hasSigningCredentials = sequenceOf(
+    "signingInMemoryKey",
+    "signingKey",
+    "signing.secretKeyRingFile"
+).any { !providers.gradleProperty(it).orNull.isNullOrBlank() }
+
 mavenPublishing {
-    publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
-    signAllPublications()
+    publishToMavenCentral()
+    if (hasSigningCredentials) {
+        signAllPublications()
+    }
     pom {
         name.set("JSON Schema Ref Parser KMP")
         description.set("JSON Schema \$ref parser, resolver and dereferencer for Kotlin Multiplatform (JVM and JS/Node.js)")
