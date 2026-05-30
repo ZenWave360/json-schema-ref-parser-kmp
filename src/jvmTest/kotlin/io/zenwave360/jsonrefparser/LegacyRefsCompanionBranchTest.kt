@@ -18,6 +18,7 @@ class LegacyRefsCompanionBranchTest {
         val bindingValue = linkedMapOf<String, Any?>("type" to "object")
 
         val doc = ParsedDocument(
+            root = mapOf("value" to publicValue),
             schema = mapOf("value" to publicValue),
             locations = mapOf("" to SourceLocation("memory://schema.yml", 0, 0, 0, 0)),
             resolvedRefs = listOf(
@@ -61,6 +62,7 @@ class LegacyRefsCompanionBranchTest {
 
         val refs = `$Refs`.from(
             ParsedDocument(
+                root = mapOf("info" to mapOf("title" to "Example")),
                 schema = mapOf("info" to mapOf("title" to "Example")),
                 locations = locations,
                 documentLocations = mapOf("memory://schema.yml" to locations),

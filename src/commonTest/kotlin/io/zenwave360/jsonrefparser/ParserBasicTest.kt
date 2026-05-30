@@ -49,6 +49,8 @@ class ParserBasicTest {
         val text = readTestFile("asyncapi/shoping-cart-avro-array/all_cart_entities.avsc")
         val doc = RefParser.fromText(text).parse().getParsedDocument()
 
+        assertTrue(doc.root is List<*>)
+        assertEquals(3, (doc.root as List<*>).size)
         assertNotNull(doc.schema)
         assertTrue(doc.locations.isNotEmpty())
     }

@@ -36,8 +36,19 @@ public class JavaRefParserJavaTest {
                 .parse()
                 .getParsedDocument();
 
+        assertEquals("object", ((Map<String, Object>) doc.getRoot()).get("type"));
         assertEquals("object", doc.getSchema().get("type"));
         assertTrue(doc.getLocations().containsKey(""));
+    }
+
+    @Test
+    public void javaFacadeExposesTopLevelArrayRoot() {
+        Object root = JavaRefParser.from(new File("src/commonTest/resources/asyncapi/sdk-javaType/avros/all_cart_entities.avsc"))
+                .parse()
+                .getRoot();
+
+        assertTrue(root instanceof java.util.List<?>);
+        assertEquals(3, ((java.util.List<?>) root).size());
     }
 
     @Test
