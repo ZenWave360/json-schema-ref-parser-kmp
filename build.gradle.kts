@@ -1,9 +1,9 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    kotlin("multiplatform") version "2.0.21"
-    id("com.vanniktech.maven.publish") version "0.34.0"
-    id("org.jetbrains.kotlinx.kover") version "0.9.4"
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.vanniktech.maven.publish)
+    alias(libs.plugins.kotlinx.kover)
 }
 
 group = "io.zenwave360.jsonrefparser"
@@ -33,25 +33,25 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("it.krzeminski:snakeyaml-engine-kmp:3.0.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+                implementation(libs.snakeyaml.engine.kmp)
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
         val jvmMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
         val jvmTest by getting
         val jsMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlin-wrappers:kotlin-node:18.16.12-pre.610")
+                implementation(libs.kotlin.node)
             }
         }
         val jsTest by getting
