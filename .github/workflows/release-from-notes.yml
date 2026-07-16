@@ -8,8 +8,11 @@ run-name: "Release v${{ inputs.version }} from main"
 # branch at dispatch time (github.sha). No branch/ref/sha/repository inputs are
 # accepted. Maven Central credentials and the GPG signing key live exclusively
 # in the protected 'maven-central-upload' GitHub Environment and are only
-# exposed to the 'sign-and-upload-central' job, which checks out no repository
-# code and executes no Gradle/npm logic. npm publication uses OIDC trusted
+# exposed to the 'build-and-publish-central' job, gated by a required
+# reviewer -- that approval, not the shape of the code that runs afterward, is
+# the actual credential boundary (Central tokens are not scoped per-operation,
+# so a hand-rolled sign/upload script would not stop a stolen token any better
+# than the plugin's own publish task does). npm publication uses OIDC trusted
 # publishing (no stored token) behind the separate protected 'npm-publish'
 # environment.
 on:
@@ -44,7 +47,6 @@ concurrency:
 env:
   NPM_PACKAGE: "@zenwave360/json-schema-ref-parser-kmp"
   NPM_PACKAGE_URLENC: "@zenwave360%2Fjson-schema-ref-parser-kmp"
-  CENTRAL_NAMESPACE: "io.zenwave360.jsonrefparser"
   CENTRAL_ARTIFACT: "json-schema-ref-parser-kmp"
 
 jobs:
@@ -396,19 +398,22 @@ jobs:
             "refs/tags/${TAG}"
 
   # ---------------------------------------------------------------------------
-  # build-and-test: full Gradle build from the immutable release commit with NO
-  # publication or signing secrets and a read-only token. Gradle plugins, tests,
-  # Kotlin/JS tooling and npm lifecycle scripts (nodejs integration tests) are
-  # treated as arbitrary code execution: there is nothing here worth stealing.
-  # Produces the exact unsigned Maven artifacts (staged to a local repository),
-  # the packed npm tarball, plus SHA256SUMS and a manifest binding everything
-  # to this release.
+  # build-and-publish-central: builds and uploads the Maven Central deployment
+  # using the plugin's own publishToMavenCentral task (never
+  # publishAndReleaseToMavenCentral, which would auto-release). Gated by the
+  # protected 'maven-central-upload' environment (required reviewer +
+  # deployments restricted to main) -- that approval before this job even
+  # starts is the actual credential boundary. Central tokens are not scoped
+  # per-operation, so a hand-rolled sign/zip/curl script would not stop a
+  # stolen token any better than this does; it just added complexity for no
+  # real security gain.
   # ---------------------------------------------------------------------------
-  build-and-test:
-    name: Build, test and stage artifacts
+  build-and-publish-central:
+    name: Build and publish Maven Central deployment (autoPublish=false)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     needs: [validate, prepare-release]
+    environment: maven-central-upload
     permissions:
       contents: read
     steps:
@@ -435,288 +440,16 @@ jobs:
         with:
           node-version: "18"
 
-      - name: Build, test and stage Maven publications locally
+      - name: Build and publish to Maven Central (requires manual Publish in the Portal)
         run: |
           set -euo pipefail
           chmod +x gradlew
-          # localStaging is a file:// repository under build/staging-deploy
-          # (declared in build.gradle.kts): publishing there needs no
-          # credentials and no signing.
-          ./gradlew build publishAllPublicationsToLocalStagingRepository
-
-      - name: Pack npm package tarball
+          ./gradlew build publishToMavenCentral
         env:
-          VERSION: ${{ needs.validate.outputs.version }}
-        run: |
-          set -euo pipefail
-          PKG_DIR="build/js/packages/json-schema-ref-parser-kmp"
-
-          if [[ ! -f "${PKG_DIR}/package.json" ]]; then
-            echo "::error::Generated npm package not found at ${PKG_DIR}."
-            exit 1
-          fi
-          NAME="$(jq -er '.name' "${PKG_DIR}/package.json")"
-          PKG_VERSION="$(jq -er '.version' "${PKG_DIR}/package.json")"
-          if [[ "${NAME}" != "${NPM_PACKAGE}" ]]; then
-            echo "::error::package.json name '${NAME}' != expected '${NPM_PACKAGE}'."
-            exit 1
-          fi
-          if [[ "${PKG_VERSION}" != "${VERSION}" ]]; then
-            echo "::error::package.json version '${PKG_VERSION}' != release version '${VERSION}'."
-            exit 1
-          fi
-
-          mkdir -p "${RUNNER_TEMP}/release-staging/npm"
-          npm pack --ignore-scripts \
-            --pack-destination "${RUNNER_TEMP}/release-staging/npm" "./${PKG_DIR}"
-
-      - name: Generate checksums and release manifest
-        env:
-          VERSION: ${{ needs.validate.outputs.version }}
-          TAG: ${{ needs.validate.outputs.tag }}
-          SOURCE_SHA: ${{ needs.validate.outputs.release_sha }}
-          RELEASE_COMMIT_SHA: ${{ needs.prepare-release.outputs.release_commit_sha }}
-        run: |
-          set -euo pipefail
-          STAGING="${RUNNER_TEMP}/release-staging"
-          cp -r build/staging-deploy "${STAGING}/maven"
-          cd "${STAGING}"
-
-          # Repository metadata is not part of a Central Portal bundle.
-          find maven -name 'maven-metadata.xml*' -type f -delete
-
-          # Every staged file must live under the expected groupId and version.
-          BAD_PATHS="$(find maven -type f \( ! -path "maven/io/zenwave360/jsonrefparser/*" -o ! -path "*/${VERSION}/*" \) || true)"
-          if [[ -n "${BAD_PATHS}" ]]; then
-            echo "::error::Staged files outside io/zenwave360/jsonrefparser/**/${VERSION}/:"
-            echo "${BAD_PATHS}"
-            exit 1
-          fi
-          if [[ ! -f "maven/io/zenwave360/jsonrefparser/${CENTRAL_ARTIFACT}/${VERSION}/${CENTRAL_ARTIFACT}-${VERSION}.pom" ]]; then
-            echo "::error::Root pom for ${VERSION} not staged; build metadata does not match the requested version."
-            exit 1
-          fi
-
-          NPM_TARBALL="$(basename "$(find npm -type f -name '*.tgz')")"
-          if [[ -z "${NPM_TARBALL}" ]]; then
-            echo "::error::npm tarball not found."
-            exit 1
-          fi
-
-          find maven npm -type f | LC_ALL=C sort | xargs -d '\n' sha256sum > SHA256SUMS
-
-          jq -n \
-            --arg repository "${GITHUB_REPOSITORY}" \
-            --arg version "${VERSION}" \
-            --arg tag "${TAG}" \
-            --arg source_sha "${SOURCE_SHA}" \
-            --arg release_commit_sha "${RELEASE_COMMIT_SHA}" \
-            --arg workflow_run_id "${GITHUB_RUN_ID}" \
-            --arg run_attempt "${GITHUB_RUN_ATTEMPT}" \
-            --arg npm_package "${NPM_PACKAGE}" \
-            --arg npm_tarball "${NPM_TARBALL}" \
-            --arg sha256sums_sha256 "$(sha256sum SHA256SUMS | awk '{print $1}')" \
-            '{repository: $repository, version: $version, tag: $tag,
-              source_sha: $source_sha, release_commit_sha: $release_commit_sha,
-              workflow_run_id: $workflow_run_id, run_attempt: $run_attempt,
-              npm_package: $npm_package, npm_tarball: $npm_tarball,
-              sha256sums_sha256: $sha256sums_sha256}' > release-manifest.json
-
-          echo "Staged $(wc -l < SHA256SUMS) files."
-
-      - name: Upload staged artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: release-staging
-          path: ${{ runner.temp }}/release-staging
-          if-no-files-found: error
-          retention-days: 14
-
-  # ---------------------------------------------------------------------------
-  # sign-and-upload-central: THE privileged Maven Central job.
-  #   * Gated by the protected 'maven-central-upload' environment (required
-  #     reviewer + deployments restricted to main). Secrets exist only there.
-  #   * Performs NO checkout and runs NO Gradle/npm: only gpg, coreutils, zip
-  #     and curl operate on the verified immutable artifacts.
-  #   * Uploads with publishingType=USER_MANAGED (autoPublish=false): the run
-  #     stops after upload; publication happens manually in the Portal UI.
-  #   Residual risk (documented): the Central token itself is technically able
-  #   to publish; the Portal button is a procedural, not cryptographic, control.
-  # ---------------------------------------------------------------------------
-  sign-and-upload-central:
-    name: Sign and upload Maven Central deployment (autoPublish=false)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: [validate, prepare-release, build-and-test]
-    environment: maven-central-upload
-    permissions:
-      contents: read # read-only token for tag verification via the API
-    steps:
-      - name: Download staged artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: release-staging
-          path: ${{ runner.temp }}/release-staging
-
-      - name: Verify release tag against release commit and main
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG: ${{ needs.validate.outputs.tag }}
-          RELEASE_COMMIT_SHA: ${{ needs.prepare-release.outputs.release_commit_sha }}
-        run: |
-          set -euo pipefail
-
-          OBJ_SHA="$(gh api "repos/${GH_REPO}/git/ref/tags/${TAG}" --jq '.object.sha')"
-          OBJ_TYPE="$(gh api "repos/${GH_REPO}/git/ref/tags/${TAG}" --jq '.object.type')"
-          if [[ "${OBJ_TYPE}" == "tag" ]]; then
-            COMMIT_SHA="$(gh api "repos/${GH_REPO}/git/tags/${OBJ_SHA}" --jq '.object.sha')"
-          else
-            COMMIT_SHA="${OBJ_SHA}"
-          fi
-          if [[ "${COMMIT_SHA}" != "${RELEASE_COMMIT_SHA}" ]]; then
-            echo "::error::Tag ${TAG} points at ${COMMIT_SHA}, expected release commit ${RELEASE_COMMIT_SHA}."
-            exit 1
-          fi
-
-          STATUS="$(gh api "repos/${GH_REPO}/compare/main...${COMMIT_SHA}" --jq '.status')"
-          if [[ "${STATUS}" != "identical" && "${STATUS}" != "behind" ]]; then
-            echo "::error::Release commit ${COMMIT_SHA} is not reachable from main (compare status: ${STATUS})."
-            exit 1
-          fi
-
-      - name: Verify artifact integrity, manifest and structure
-        env:
-          VERSION: ${{ needs.validate.outputs.version }}
-          TAG: ${{ needs.validate.outputs.tag }}
-          SOURCE_SHA: ${{ needs.validate.outputs.release_sha }}
-          RELEASE_COMMIT_SHA: ${{ needs.prepare-release.outputs.release_commit_sha }}
-        run: |
-          set -euo pipefail
-          cd "${RUNNER_TEMP}/release-staging"
-
-          # Expected top-level entries only.
-          for entry in * .[!.]* ..?*; do
-            [[ -e "${entry}" ]] || continue
-            case "${entry}" in
-              maven|npm|SHA256SUMS|release-manifest.json) ;;
-              *) echo "::error::Unexpected entry in artifact: ${entry}"; exit 1 ;;
-            esac
-          done
-
-          # No symlinks, no unexpected characters, no path traversal.
-          if [[ -n "$(find . -type l)" ]]; then
-            echo "::error::Symlinks found in downloaded artifact."; exit 1
-          fi
-          BAD_NAMES="$(find . -type f | grep -Ev '^\./((maven/io/[A-Za-z0-9][A-Za-z0-9._/-]*)|(npm/[A-Za-z0-9][A-Za-z0-9._-]*\.tgz)|SHA256SUMS|release-manifest\.json)$' || true)"
-          if [[ -n "${BAD_NAMES}" ]] || find . | grep -qF '..'; then
-            echo "::error::Files with unexpected names or paths:"; echo "${BAD_NAMES}"; exit 1
-          fi
-
-          # Manifest must bind these artifacts to THIS release and THIS run.
-          check() { # check <jq-field> <expected>
-            ACTUAL="$(jq -er ".$1" release-manifest.json)"
-            if [[ "${ACTUAL}" != "$2" ]]; then
-              echo "::error::Manifest $1='${ACTUAL}' does not match expected '$2'."; exit 1
-            fi
-          }
-          check repository "${GITHUB_REPOSITORY}"
-          check version "${VERSION}"
-          check tag "${TAG}"
-          check source_sha "${SOURCE_SHA}"
-          check release_commit_sha "${RELEASE_COMMIT_SHA}"
-          check workflow_run_id "${GITHUB_RUN_ID}"
-          check sha256sums_sha256 "$(sha256sum SHA256SUMS | awk '{print $1}')"
-
-          # Every file checksums correctly, and every file is accounted for.
-          sha256sum --check --quiet --strict SHA256SUMS
-          diff <(find maven npm -type f | LC_ALL=C sort) <(awk '{print $NF}' SHA256SUMS | LC_ALL=C sort)
-
-          echo "Verified $(wc -l < SHA256SUMS) files against SHA256SUMS and release-manifest.json."
-
-      - name: Import signing key
-        env:
-          SIGN_KEY: ${{ secrets.SIGN_KEY }}
-        run: |
-          set -euo pipefail
-          umask 077
-          GNUPGHOME="$(mktemp -d)"
-          export GNUPGHOME
-          echo "GNUPGHOME=${GNUPGHOME}" >> "${GITHUB_ENV}"
-          printf '%s' "${SIGN_KEY}" | gpg --batch --quiet --import
-
-      - name: Sign artifacts and complete Central checksums
-        env:
-          SIGN_KEY_PASS: ${{ secrets.SIGN_KEY_PASS }}
-        run: |
-          set -euo pipefail
-          cd "${RUNNER_TEMP}/release-staging"
-
-          # Every deployable file needs .asc/.md5/.sha1 for Central validation.
-          # Fail loudly if the staging repo ever contains a surprise file type;
-          # never execute downloaded content.
-          find maven/io -type f \
-            ! -name '*.asc' ! -name '*.md5' ! -name '*.sha1' \
-            ! -name '*.sha256' ! -name '*.sha512' | while read -r f; do
-            if [[ ! "${f}" =~ \.(pom|jar|module|klib|json)$ ]]; then
-              echo "::error::Refusing to sign unexpected file type: ${f}"
-              exit 1
-            fi
-            printf '%s' "${SIGN_KEY_PASS}" | gpg --batch --yes --quiet \
-              --pinentry-mode loopback --passphrase-fd 0 \
-              --armor --detach-sign --output "${f}.asc" "${f}"
-            [[ -f "${f}.md5" ]]  || md5sum "${f}"  | awk '{print $1}' > "${f}.md5"
-            [[ -f "${f}.sha1" ]] || sha1sum "${f}" | awk '{print $1}' > "${f}.sha1"
-          done
-          echo "Signed $(find maven/io -name '*.asc' | wc -l) files."
-
-      - name: Upload deployment bundle to Maven Central Portal (USER_MANAGED)
-        env:
-          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-          CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
-          VERSION: ${{ needs.validate.outputs.version }}
-        run: |
-          set -euo pipefail
-          umask 077
-
-          (cd "${RUNNER_TEMP}/release-staging/maven" && zip -qr "${RUNNER_TEMP}/central-bundle.zip" io)
-
-          # Credentials go through a curl config file, never argv.
-          CURL_CFG="$(mktemp)"
-          trap 'rm -f "${CURL_CFG}"' EXIT
-          printf 'header = "Authorization: Bearer %s"\n' \
-            "$(printf '%s:%s' "${CENTRAL_USERNAME}" "${CENTRAL_TOKEN}" | base64 -w0)" > "${CURL_CFG}"
-
-          # Idempotency guard: refuse to upload an already-published version.
-          PUBLISHED="$(curl -sS --fail-with-body -K "${CURL_CFG}" \
-            "https://central.sonatype.com/api/v1/publisher/published?namespace=${CENTRAL_NAMESPACE}&name=${CENTRAL_ARTIFACT}&version=${VERSION}" \
-            | jq -er '.published')"
-          if [[ "${PUBLISHED}" != "false" ]]; then
-            echo "::error::Version ${VERSION} is already published on Maven Central."
-            exit 1
-          fi
-
-          # USER_MANAGED == autoPublish=false: the deployment is only validated
-          # and staged. This workflow NEVER calls the publish operation; you
-          # review and click Publish in https://central.sonatype.com/publishing
-          DEPLOYMENT_ID="$(curl -sS --fail-with-body -K "${CURL_CFG}" -X POST \
-            -F "bundle=@${RUNNER_TEMP}/central-bundle.zip" \
-            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=USER_MANAGED&name=${CENTRAL_ARTIFACT}-v${VERSION}")"
-
-          {
-            echo "### Maven Central deployment uploaded (NOT published)"
-            echo "- Deployment ID: \`${DEPLOYMENT_ID}\`"
-            echo "- Review and click **Publish** at https://central.sonatype.com/publishing/deployments"
-          } >> "${GITHUB_STEP_SUMMARY}"
-
-      - name: Clean up signing key material
-        if: always()
-        run: |
-          set -euo pipefail
-          if [[ -n "${GNUPGHOME:-}" && -d "${GNUPGHOME}" ]]; then
-            find "${GNUPGHOME}" -type f -exec shred -u {} + 2>/dev/null || true
-            rm -rf "${GNUPGHOME}"
-          fi
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_TOKEN }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGN_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGN_KEY_PASS }}
 
   # ---------------------------------------------------------------------------
   # create-github-release: runs AFTER the Central upload succeeded, so a GitHub
@@ -728,7 +461,7 @@ jobs:
     name: Create GitHub release
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [validate, prepare-release, sign-and-upload-central]
+    needs: [validate, prepare-release, build-and-publish-central]
     permissions:
       contents: write # create the GitHub release for the existing tag
     steps:
@@ -752,93 +485,40 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # publish-npm: the privileged npm job. Skipped entirely unless the
-  # publishNpm input is true.
-  #   * Gated by the protected 'npm-publish' environment: its OWN required
-  #     reviewer, separate from Maven Central approval. No Maven Central
-  #     credentials are available here, and no npm credentials exist at all:
-  #     publication uses OIDC trusted publishing (id-token: write), which npm
-  #     validates against this repository + workflow + environment.
-  #   * No checkout; publishes the verified immutable tarball from the build
-  #     job with --ignore-scripts, so no repository-controlled code executes.
-  #   * Runs after the Central upload to keep the ecosystems in lockstep; you
-  #     can approve it after clicking Publish in the Central Portal.
+  # publishNpm input is true. Gated by the protected 'npm-publish' environment:
+  # its OWN required reviewer, separate from Maven Central approval. No Maven
+  # Central credentials are available here, and no npm credentials exist at
+  # all: publication uses OIDC trusted publishing (id-token: write), which npm
+  # validates against this repository + workflow + environment. Builds the
+  # package itself from the immutable release commit (self-contained, no
+  # cross-job artifact) and publishes with --ignore-scripts.
   # ---------------------------------------------------------------------------
   publish-npm:
     name: Publish npm package (OIDC trusted publishing)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: [validate, prepare-release, build-and-test, sign-and-upload-central]
+    timeout-minutes: 30
+    needs: [validate, prepare-release, build-and-publish-central]
     if: needs.validate.outputs.publish_npm == 'true'
     environment: npm-publish
     permissions:
       contents: read
       id-token: write # OIDC token for npm trusted publishing (no stored secret)
     steps:
-      - name: Download staged artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - name: Checkout immutable release commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          name: release-staging
-          path: ${{ runner.temp }}/release-staging
+          ref: ${{ needs.prepare-release.outputs.release_commit_sha }}
+          persist-credentials: false
 
-      - name: Verify artifact integrity and npm package contents
-        env:
-          VERSION: ${{ needs.validate.outputs.version }}
-          TAG: ${{ needs.validate.outputs.tag }}
-          SOURCE_SHA: ${{ needs.validate.outputs.release_sha }}
-          RELEASE_COMMIT_SHA: ${{ needs.prepare-release.outputs.release_commit_sha }}
-        run: |
-          set -euo pipefail
-          cd "${RUNNER_TEMP}/release-staging"
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
 
-          # Same integrity gate as the Central job: nothing is trusted until
-          # verified against the manifest and checksums.
-          if [[ -n "$(find . -type l)" ]]; then
-            echo "::error::Symlinks found in downloaded artifact."; exit 1
-          fi
-          check() { # check <jq-field> <expected>
-            ACTUAL="$(jq -er ".$1" release-manifest.json)"
-            if [[ "${ACTUAL}" != "$2" ]]; then
-              echo "::error::Manifest $1='${ACTUAL}' does not match expected '$2'."; exit 1
-            fi
-          }
-          check repository "${GITHUB_REPOSITORY}"
-          check version "${VERSION}"
-          check tag "${TAG}"
-          check source_sha "${SOURCE_SHA}"
-          check release_commit_sha "${RELEASE_COMMIT_SHA}"
-          check workflow_run_id "${GITHUB_RUN_ID}"
-          check npm_package "${NPM_PACKAGE}"
-          check sha256sums_sha256 "$(sha256sum SHA256SUMS | awk '{print $1}')"
-          sha256sum --check --quiet --strict SHA256SUMS
-
-          TARBALL="$(jq -er '.npm_tarball' release-manifest.json)"
-          if [[ ! "${TARBALL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.tgz$ || ! -f "npm/${TARBALL}" ]]; then
-            echo "::error::Invalid or missing npm tarball '${TARBALL}'."
-            exit 1
-          fi
-
-          # Tarball entries must all live under package/ (no traversal), and
-          # the embedded package.json must match the expected name/version
-          # with no lifecycle scripts.
-          if tar -tzf "npm/${TARBALL}" | grep -Ev '^package/'; then
-            echo "::error::Tarball contains entries outside package/."
-            exit 1
-          fi
-          PKG_JSON="$(tar -xzOf "npm/${TARBALL}" package/package.json)"
-          if [[ "$(jq -er '.name' <<< "${PKG_JSON}")" != "${NPM_PACKAGE}" ]]; then
-            echo "::error::Tarball package name does not match ${NPM_PACKAGE}."
-            exit 1
-          fi
-          if [[ "$(jq -er '.version' <<< "${PKG_JSON}")" != "${VERSION}" ]]; then
-            echo "::error::Tarball package version does not match ${VERSION}."
-            exit 1
-          fi
-          if ! jq -e '(.scripts // {}) | length == 0' <<< "${PKG_JSON}" >/dev/null; then
-            echo "::error::Tarball package.json declares lifecycle scripts; refusing to publish."
-            exit 1
-          fi
-
-          echo "TARBALL=${TARBALL}" >> "${GITHUB_ENV}"
+      - name: Set up JDK 17
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: "gradle"
 
       # npm >= 11.5.1 is required for OIDC trusted publishing; Node 24 bundles it.
       - name: Setup Node.js
@@ -847,12 +527,53 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Build and pack npm package
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew build
+
+          PKG_DIR="build/js/packages/json-schema-ref-parser-kmp"
+          if [[ ! -f "${PKG_DIR}/package.json" ]]; then
+            echo "::error::Generated npm package not found at ${PKG_DIR}."
+            exit 1
+          fi
+          NAME="$(jq -er '.name' "${PKG_DIR}/package.json")"
+          PKG_VERSION="$(jq -er '.version' "${PKG_DIR}/package.json")"
+          if [[ "${NAME}" != "${NPM_PACKAGE}" ]]; then
+            echo "::error::package.json name '${NAME}' != expected '${NPM_PACKAGE}'."
+            exit 1
+          fi
+          if [[ "${PKG_VERSION}" != "${VERSION}" ]]; then
+            echo "::error::package.json version '${PKG_VERSION}' != release version '${VERSION}'."
+            exit 1
+          fi
+
+          mkdir -p "${RUNNER_TEMP}/npm"
+          npm pack --ignore-scripts --pack-destination "${RUNNER_TEMP}/npm" "./${PKG_DIR}"
+          TARBALL="$(basename "$(find "${RUNNER_TEMP}/npm" -type f -name '*.tgz')")"
+
+          # Tarball entries must all live under package/ (no traversal), and
+          # the embedded package.json must match with no lifecycle scripts.
+          if tar -tzf "${RUNNER_TEMP}/npm/${TARBALL}" | grep -Ev '^package/'; then
+            echo "::error::Tarball contains entries outside package/."
+            exit 1
+          fi
+          if ! tar -xzOf "${RUNNER_TEMP}/npm/${TARBALL}" package/package.json \
+              | jq -e '(.scripts // {}) | length == 0' >/dev/null; then
+            echo "::error::Tarball package.json declares lifecycle scripts; refusing to publish."
+            exit 1
+          fi
+
+          echo "TARBALL=${TARBALL}" >> "${GITHUB_ENV}"
+
       - name: Publish to npm via OIDC trusted publishing
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          cd "${RUNNER_TEMP}/release-staging"
 
           NPM_VERSION="$(npm --version)"
           if [[ "$(printf '%s\n' 11.5.1 "${NPM_VERSION}")" != "$(printf '%s\n' 11.5.1 "${NPM_VERSION}" | sort -V)" ]]; then
@@ -875,7 +596,7 @@ jobs:
           # short-lived publish credential and attaches provenance
           # automatically. --ignore-scripts is defense in depth on top of the
           # scripts check above.
-          npm publish "npm/${TARBALL}" --ignore-scripts --access public
+          npm publish "${RUNNER_TEMP}/npm/${TARBALL}" --ignore-scripts --access public
 
           {
             echo "### npm package published"
