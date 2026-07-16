@@ -79,7 +79,7 @@ jobs:
       # github.sha is the tip of main captured once at dispatch time; it does
       # not move if main receives new pushes, and it is stable across reruns.
       - name: Checkout trusted main commit
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
@@ -239,7 +239,7 @@ jobs:
       release_commit_sha: ${{ steps.commit.outputs.release_commit_sha }}
     steps:
       - name: Checkout trusted main commit
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.validate.outputs.release_sha }}
           fetch-depth: 0
@@ -418,7 +418,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout immutable release commit
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.prepare-release.outputs.release_commit_sha }}
           persist-credentials: false
@@ -466,7 +466,7 @@ jobs:
       contents: write # create the GitHub release for the existing tag
     steps:
       - name: Checkout immutable release commit
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.prepare-release.outputs.release_commit_sha }}
           persist-credentials: false
@@ -505,7 +505,7 @@ jobs:
       id-token: write # OIDC token for npm trusted publishing (no stored secret)
     steps:
       - name: Checkout immutable release commit
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.prepare-release.outputs.release_commit_sha }}
           persist-credentials: false
