@@ -136,6 +136,30 @@ class RefParserJvmTest {
     }
 
     @Test
+    fun `legacy parser accepts json text with base uri constructor`() {
+        val json = """
+            {
+              "openapi": "3.0.1",
+              "info": {
+                "title": "Inline Doc",
+                "version": "1.0.0"
+              }
+            }
+        """.trimIndent()
+
+        val doc = `$RefParser`(json, URI.create("memory://inline/openapi.json"))
+            .parse()
+            .getRefs()
+
+        val schema = doc.schema() as Map<*, *>
+        assertEquals("3.0.1", schema["openapi"])
+        assertEquals(
+            "memory://inline/openapi.json",
+            doc.getJsonLocationRange("$")!!.first.file,
+        )
+    }
+
+    @Test
     fun `java ref parser loads classpath resources from injected jar classloader`() {
         val tempRoot = Files.createTempDirectory("java-ref-parser-classpath-loader-jar-test")
         val jarFile = tempRoot.resolve("test-resources.jar").toFile()

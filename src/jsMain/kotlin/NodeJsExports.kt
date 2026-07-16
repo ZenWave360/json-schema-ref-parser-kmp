@@ -20,6 +20,7 @@ fun parseSchemaText(input: String, baseUri: String = "memory://anonymous"): Any?
     val raw = parseText(input, normalizedBaseUri)
     return exportParsedDocument(
         ParsedDocument(
+            root = raw.root,
             schema = raw.map,
             locations = raw.locations,
             documentLocations = mapOf(raw.uri to raw.locations),
@@ -53,6 +54,7 @@ fun dereferenceSchemaText(
 
 private fun exportParsedDocument(document: ParsedDocument): Any? {
     val result = js("{}")
+    result.root = convertToPlain(document.root)
     result.schema = convertToPlain(document.schema)
     result.locations = convertToPlain(document.locations)
     result.documentLocations = convertToPlain(document.documentLocations)

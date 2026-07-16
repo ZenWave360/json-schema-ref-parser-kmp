@@ -57,6 +57,8 @@ class JavaRefParser internal constructor(
         return this
     }
 
+    fun getRoot(): Any? = refParser.getRoot()
+
     fun getParsedDocument(): ParsedDocument = refParser.getParsedDocument()
 
     internal fun toRefParser(): RefParser = refParser

@@ -121,6 +121,7 @@ class RefParser(
     // -----------------------------------------------------------------------
 
     fun getParsedDocument(): ParsedDocument = ParsedDocument(
+        root = rawRoot ?: schema,
         schema = schema,
         locations = locations,
         documentLocations = documentLocations,
@@ -128,6 +129,8 @@ class RefParser(
         originalAllOfs = originalAllOfEntries,
         hasCircularRefs = hasCircularRefs,
     )
+
+    fun getRoot(): Any? = rawRoot ?: schema
 
     // -----------------------------------------------------------------------
     // Helpers

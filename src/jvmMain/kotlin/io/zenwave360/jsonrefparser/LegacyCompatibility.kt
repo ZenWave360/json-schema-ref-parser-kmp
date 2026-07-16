@@ -275,6 +275,7 @@ data class JsonLocation(
 
 class `$RefParser`(
     private val uri: String,
+    private val sourceText: String? = null,
 ) {
     private var resourceClassLoader: ClassLoader? = null
     private var compatibilityOptions = `$RefParserOptions`()
@@ -284,9 +285,11 @@ class `$RefParser`(
     private var coreParser: RefParser? = null
     private var dereferenced = false
 
-    constructor(uri: URI) : this(uri.toString())
+    constructor(uri: URI) : this(uri.toString(), null)
 
-    constructor(file: File) : this(file.toURI().toString())
+    constructor(file: File) : this(file.toURI().toString(), null)
+
+    constructor(json: String, uri: URI) : this(uri.toString(), json)
 
     private fun normalizedCompatibilityUri(): String {
         if (uri.startsWith("classpath:")) {
@@ -341,7 +344,13 @@ class `$RefParser`(
         withAuthentication(authentication)
 
     private fun getOrCreateCoreParser(): RefParser =
-        coreParser ?: JavaRefParser.from(normalizedCompatibilityUri())
+        coreParser ?: (
+            if (sourceText != null) {
+                JavaRefParser.fromText(sourceText, normalizedCompatibilityUri())
+            } else {
+                JavaRefParser.from(normalizedCompatibilityUri())
+            }
+        )
             .withOptions(compatibilityOptions.toCore())
             .withAuthenticationValues(*authentication.toTypedArray())
             .withResourceClassLoader(resourceClassLoader)
@@ -373,6 +382,7 @@ class `$RefParser`(
 
     fun getRefs(): `$Refs` {
         val parsed = document ?: ParsedDocument(
+            root = emptyMap<String, Any?>(),
             schema = emptyMap(),
             locations = emptyMap(),
             documentLocations = emptyMap(),
@@ -386,6 +396,6 @@ class `$RefParser`(
     private fun syncFrom(parser: RefParser) {
         val parsed = parser.getParsedDocument()
         document = parsed
-        rootValue = parser.rawRoot ?: parsed.schema
+        rootValue = parsed.root
     }
 }

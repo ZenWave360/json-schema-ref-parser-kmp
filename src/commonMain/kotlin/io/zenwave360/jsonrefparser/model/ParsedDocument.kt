@@ -3,12 +3,14 @@ package io.zenwave360.jsonrefparser.model
 /**
  * The result of a fully parsed (and optionally dereferenced) schema.
  *
+ * @param root         The actual parsed top-level value, which may be a Map or List.
  * @param schema       The fully resolved map-of-maps representation.
  * @param locations    JSON Pointer string → source location for every node.
  * @param resolvedRefs Every `$ref` that was resolved during dereferencing.
  * @param originalAllOfs Every `allOf` array before it was merged.
  */
 data class ParsedDocument(
+    val root: Any?,
     val schema: Map<String, Any?>,
     val locations: Map<String, SourceLocation>,
     val documentLocations: Map<String, Map<String, SourceLocation>> = emptyMap(),
