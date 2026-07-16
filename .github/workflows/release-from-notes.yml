@@ -322,7 +322,7 @@ jobs:
             "https://x-access-token@github.com/${GITHUB_REPOSITORY}.git" \
             "HEAD:refs/heads/release/${VERSION}"
 
-      - name: Open and auto-merge release PR
+      - name: Open and merge release PR
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
@@ -336,11 +336,17 @@ jobs:
             --body "Automated release commit and next-development version bump for ${TAG}. This PR is required because main is protected; once merged, the release continues automatically.")"
           PR_NUMBER="${PR_URL##*/}"
           echo "pr_number=${PR_NUMBER}" >> "${GITHUB_OUTPUT}"
-          gh pr merge "${PR_NUMBER}" --merge --auto --delete-branch
+          # Merge immediately rather than requesting GitHub's native auto-merge
+          # (which requires the repo-level "Allow auto-merge" setting and
+          # would otherwise just fail with a GraphQL error). This works because
+          # required approvals is 0 and main has no required status checks that
+          # only run on pull_request events, so the PR is already mergeable.
+          gh pr merge "${PR_NUMBER}" --merge --delete-branch
 
-      # Waits for GitHub's native auto-merge to land the PR (e.g. once required
-      # status checks pass). Fails fast on a real conflict or on the PR being
-      # closed unmerged, instead of spinning for the full timeout.
+      # Safety net: the merge above is normally synchronous, but this confirms
+      # it actually landed (e.g. if a merge queue or delayed check deferred
+      # it) and fails fast on a real conflict or on the PR being closed
+      # unmerged, instead of spinning for the full timeout.
       - name: Wait for release PR to merge
         env:
           GH_TOKEN: ${{ github.token }}

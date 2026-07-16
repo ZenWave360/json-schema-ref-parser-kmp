@@ -78,8 +78,10 @@ derived release commit) through every job.
 
 `prepare-release` does **not** push directly to `main`. It pushes the release
 commit and the next-SNAPSHOT commit to a throwaway `release/<version>`
-branch, opens a PR into `main`, enables GitHub's native auto-merge, and waits
-for the PR to actually merge before pushing the tag. This is deliberate:
+branch, opens a PR into `main`, and merges it immediately (required approvals
+is 0 and `main` has no required status checks that only run on `pull_request`
+events, so the PR is already mergeable — no dependency on the repo-level
+"Allow auto-merge" setting) before pushing the tag. This is deliberate:
 `main`'s ruleset requires a pull request, and the only way to push directly
 despite that would be adding a bypass actor to the ruleset. Ruleset bypass is
 granted to an **identity** (e.g. "GitHub Actions"), not to this one job —
@@ -227,8 +229,8 @@ required reviewers.
   privileged identity to grant. If you also require status checks on `main`,
   make sure at least one check actually runs on `pull_request` events (this
   repo's CI currently only triggers on `push`/`workflow_dispatch`), otherwise
-  the release PR's auto-merge will wait until `prepare-release`'s own
-  15-minute timeout and fail.
+  the immediate merge in `prepare-release` will fail outright with an
+  unmergeable-PR error.
 - **Tag ruleset `v*`**: block updates and deletions for everyone (immutable
   tags). Tag **creation** does not need to be restricted to a bypass actor:
   by the time `prepare-release` pushes a tag, the commit it points to has
@@ -296,9 +298,12 @@ Same procedures as zenwave-sdk (`docs/release-security.md` there):
 2. **Snapshot credentials trust `develop`/`next`** — see snapshot section.
 3. **npm publication trusts the environment approval + OIDC claims** — no
    token exists, but an approved run of this workflow from `main` can publish.
-4. **GitHub Actions app bypass on `main`** — narrowed by read-only default
-   workflow permissions and CODEOWNERS on `.github/`; use a dedicated GitHub
-   App to narrow further.
+4. **No ruleset bypass actor exists on `main` or `v*` anymore.** The release
+   commit lands via an auto-merged PR instead, which was a deliberate change
+   from an earlier design that would have added a "GitHub Actions" bypass —
+   that approach was rejected because ruleset bypass is actor-based, not
+   job-based: it would have let *any* workflow in this repository with
+   `contents:write` push straight to `main`, not just `prepare-release`.
 5. **Trust in `main` itself** — everything on `main` is by definition trusted;
    branch protection and reviews are what make that hold.
 
