@@ -17,18 +17,7 @@ actual fun testResourceUri(path: String): String {
 private fun resolveTestResourcePath(path: String): String {
     val moduleFilePath = NodeUrlModule.fileURLToPath(js("import.meta.url") as String)
     val moduleDir = NodePathModule.dirname(moduleFilePath)
-    return NodePathModule.resolve(
-        moduleDir,
-        "..",
-        "..",
-        "..",
-        "..",
-        "..",
-        "src",
-        "commonTest",
-        "resources",
-        path,
-    )
+    return NodePathModule.resolve(moduleDir, path)
 }
 
 @JsModule("node:path")

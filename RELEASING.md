@@ -1,49 +1,56 @@
 # Releasing
 
-This repository publishes Kotlin Multiplatform artifacts to Maven Central through the Sonatype Central Portal.
+This repository publishes Kotlin Multiplatform artifacts to Maven Central and
+(optionally) the generated JS package to npm, through the `Release from Notes`
+workflow. The complete security model — trust boundaries, required GitHub and
+npm configuration, credential handling, residual risks — is documented in
+[docs/release-security.md](docs/release-security.md). Read that before
+changing anything under `.github/workflows/`.
 
 ## Artifacts
 
-The release workflow publishes these coordinates:
+- Maven Central: `io.zenwave360.jsonrefparser:json-schema-ref-parser-kmp`,
+  `-jvm`, `-js`
+- npm (optional): `@zenwave360/json-schema-ref-parser-kmp`
 
-- `io.zenwave360.jsonrefparser:json-schema-ref-parser-kmp`
-- `io.zenwave360.jsonrefparser:json-schema-ref-parser-kmp-jvm`
-- `io.zenwave360.jsonrefparser:json-schema-ref-parser-kmp-js`
+## Release steps
 
-## Repository Prerequisites
+1. Write `release-notes/release-notes.v<VERSION>.md` (plain feature list, not
+   a commit log; it must mention the version) and commit it — along with any
+   intended release changes — to `main`.
+2. Run the **Release from Notes** workflow from the `main` branch with:
+   - `version`, e.g. `1.0.0` (or `1.0.0-rc.1`); no `v` prefix
+   - `developmentVersion`, optional; defaults to the next patch `-SNAPSHOT`
+   - `publishNpm`, default `false` until the npm account is set up
+3. The workflow validates everything, creates the release commit and tag
+   `v<VERSION>` on `main`, builds and tests (JVM, JS, Node integration tests)
+   without any credentials, then waits.
+4. Approve the **maven-central-upload** environment. The privileged job signs
+   the verified artifacts and uploads the deployment as **USER_MANAGED**
+   (`autoPublish=false`), then creates the GitHub release and syncs `main`
+   back to `develop`.
+5. Go to [central.sonatype.com](https://central.sonatype.com/publishing/deployments),
+   review the deployment, and click **Publish**. Nothing is public until you do.
+6. If `publishNpm` was checked: approve the **npm-publish** environment
+   (typically after the Portal Publish click). The verified tarball is
+   published via OIDC trusted publishing with provenance — no npm token exists
+   anywhere.
 
-Before the first public release, make sure all of the following are in place:
+The first-ever npm publish is manual (OIDC trusted publishing requires an
+existing package): see
+[docs/release-security.md#first-npm-publish](docs/release-security.md#first-npm-publish).
 
-1. The GitHub repository is public.
-2. The `io.zenwave360.jsonrefparser` namespace is registered and verified in the Sonatype Central Portal.
-3. A GPG keypair exists for artifact signing and the public key has been published.
-4. GitHub Actions secrets are configured.
+## Snapshot publishing
 
-Supported secret names used by the current GitHub workflows:
+The `Build and Publish Snapshots` workflow runs `./gradlew publishToMavenCentral`
+on every push to `develop`/`next`. Keep the version on a `-SNAPSHOT` suffix
+between releases — the workflow refuses to publish otherwise.
 
-- `CENTRAL_USERNAME`
-- `CENTRAL_TOKEN`
-- `SIGN_KEY`
-- `SIGN_KEY_PASS`
+## Required configuration (one-time)
 
-## Release Flow
-
-There are two workflows involved:
-
-1. `Create Gradle Release`
-   Updates `build.gradle.kts` to the release version, creates tag `v<releaseVersion>`, bumps to the next snapshot version, and opens a release PR.
-2. `Publish Release to Maven Central`
-   Runs automatically when a `v*` tag is pushed and executes `./gradlew publishAndReleaseToMavenCentral`.
-
-## Manual Release Steps
-
-1. Run the `Create Gradle Release` workflow with:
-   - `releaseVersion`, for example `0.9.20`
-   - `developmentVersion`, for example `1.0.0-SNAPSHOT`
-2. Verify that tag `v<releaseVersion>` was pushed.
-3. Watch the `Publish Release to Maven Central` workflow.
-4. After Central Portal validation and release complete, wait for Maven Central indexing.
-
-## Snapshot Publishing
-
-The `Build and Publish Snapshots` workflow uses `./gradlew publishToMavenCentral`. Keep the project version on a `-SNAPSHOT` suffix when using that workflow.
+GitHub Environments `maven-central-upload` (reviewer required, `main` only,
+holds `CENTRAL_USERNAME`/`CENTRAL_TOKEN`/`SIGN_KEY`/`SIGN_KEY_PASS`),
+`maven-central-snapshots` (`develop`/`next`, same secrets), and `npm-publish`
+(reviewer required, `main` only, no secrets); `main` and `v*` rulesets; and
+read-only default workflow permissions. Details and rationale:
+[docs/release-security.md](docs/release-security.md#required-github-configuration).

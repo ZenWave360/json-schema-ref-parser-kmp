@@ -36,6 +36,22 @@ If you work with JSON Schema, OpenAPI, or AsyncAPI specifications, you know the 
 
 This library handles all of that for you. It is a full [JSON Reference](https://tools.ietf.org/html/draft-pbryan-zyp-json-ref-03) and [JSON Pointer](https://tools.ietf.org/html/rfc6901) implementation that crawls even complex schemas and returns a simple object tree with source locations and resolved ref tracking.
 
+## Features
+
+- Parses JSON, YAML, and Avro schemas, or any mix of them
+- Dereferences `$ref` pointers into a plain object tree
+- Cross-file references: local files, remote URLs, and classpath resources on the JVM
+- Object identity: two `$ref` pointers to the same target resolve to the same object instance
+- Source locations for every parsed node
+- Original ref tracking for resolved objects
+- Merges `allOf` arrays into a single object
+- Non-mutating, graph-safe JSON Merge Patch utility that powers trait composition in [asyncapi-parser-kmp](https://github.com/ZenWave360/asyncapi-parser-kmp)
+- Authentication headers and query parameters for remote loading
+- Circular reference detection with resolve, skip, and fail modes
+- Missing reference handling with skip and fail modes
+- JVM and Node.js support through Kotlin Multiplatform
+- JVM compatibility layer for existing `json-schema-ref-parser-jvm` users
+
 ## Quick Start
 
 ### Kotlin with `RefParser`
@@ -416,20 +432,21 @@ const doc = parseSchemaText("{\"type\":\"object\"}", "memory://schema.json");
 console.log(doc.locations[""]);
 ```
 
-## Features
+## JSON Merge Patch
 
-- Parses JSON, YAML, and Avro schemas, or any mix of them
-- Dereferences `$ref` pointers into a plain object tree
-- Cross-file references: local files, remote URLs, and classpath resources on the JVM
-- Object identity: two `$ref` pointers to the same target resolve to the same object instance
-- Source locations for every parsed node
-- Original ref tracking for resolved objects
-- Merges `allOf` arrays into a single object
-- Authentication headers and query parameters for remote loading
-- Circular reference detection with resolve, skip, and fail modes
-- Missing reference handling with skip and fail modes
-- JVM and Node.js support through Kotlin Multiplatform
-- JVM compatibility layer for existing `json-schema-ref-parser-jvm` users
+The generic core module contains a non-mutating, graph-safe JSON Merge Patch utility:
+
+```kotlin
+import io.zenwave360.jsonrefparser.merge.JsonMergePatch
+import io.zenwave360.jsonrefparser.merge.jsonMergePatch
+
+val effective = JsonMergePatch.apply(target, patch)
+val equivalent = jsonMergePatch(target, patch)
+```
+
+It implements RFC 7396 semantics: object members merge recursively, `null` removes an object member, and arrays/scalars replace atomically. The result does not alias mutable maps or lists from either input. Circular and shared parser graphs terminate safely.
+
+This is the same utility that powers trait composition in [asyncapi-parser-kmp](https://github.com/ZenWave360/asyncapi-parser-kmp).
 
 ## Release
 

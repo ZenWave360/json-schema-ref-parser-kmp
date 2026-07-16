@@ -34,42 +34,9 @@
 
 ## Release Process
 
-### 1. Create a Release
+See [RELEASING.md](RELEASING.md) for the full flow. In short: add a `release-notes/release-notes.v<version>.md` file, then trigger the **Release from Notes** workflow from GitHub Actions with the release version, next development version, and target branch. It prepares the version bump, tags the release, uploads the deployment to Maven Central as USER_MANAGED, and creates the GitHub Release. A human still has to log into [central.sonatype.com](https://central.sonatype.com) and click **Publish** to make it live.
 
-Trigger the **Create Gradle Release** workflow from GitHub Actions:
-
-1. Go to **Actions** → **Create Gradle Release** → **Run workflow**
-2. Enter the release version, for example `0.2.0`
-3. Enter the next development version, for example `0.3.0-SNAPSHOT`
-
-This workflow will:
-
-- Update `version` in `build.gradle.kts` to the release version
-- Create a git tag `v{version}`
-- Update `version` in `build.gradle.kts` to the next development version
-- Push a release branch
-- Create a pull request against `main`
-- Enable PR auto-merge
-- Push the release tag
-
-### 2. Publish the Release
-
-After the release tag is created, publish a GitHub Release:
-
-1. Go to **Releases** → **Draft a new release**
-2. Select the tag created in step 1, for example `v0.2.0`
-3. Generate release notes or write your own
-4. Publish the release
-
-This automatically triggers the **Publish Release to Maven Central and NPM** workflow, which:
-
-- Checks out the released tag
-- Builds and tests the project
-- Publishes all Maven publications to Maven Central
-- Uploads build artifacts
-- ~~Publishes the JS package to npm~~, currently disabled in the workflow
-
-### 3. Snapshot Releases
+### Snapshot Releases
 
 Snapshots are automatically built and published on pushes to `develop` and `next` through the **Build and Publish Snapshots** workflow.
 
