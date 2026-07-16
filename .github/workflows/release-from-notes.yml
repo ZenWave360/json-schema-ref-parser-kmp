@@ -204,22 +204,35 @@ jobs:
           } >> "${GITHUB_STEP_SUMMARY}"
 
   # ---------------------------------------------------------------------------
-  # prepare-release: the ONLY job with contents:write before publication.
-  # Bumps the version in build.gradle.kts with sed (NO Gradle execution, so no
-  # repository-controlled code runs in this job at all), creates the release
-  # commit + next development commit, tags, and pushes atomically to main.
+  # prepare-release: the ONLY job with contents:write/pull-requests:write before
+  # publication. Bumps the version in build.gradle.kts with sed (NO Gradle
+  # execution, so no repository-controlled code runs in this job at all),
+  # creates the release commit + next development commit on a throwaway
+  # release/<version> branch, and lands them on main via a PR (auto-merged,
+  # not pushed directly).
+  #
+  # Why a PR instead of a direct push: main's ruleset requires changes to go
+  # through a pull request. A direct push would need a bypass actor added to
+  # that ruleset -- but ruleset bypass is granted to an IDENTITY (e.g. "GitHub
+  # Actions"), not to this one job. Any other workflow in the repo capable of
+  # authenticating as that identity would inherit the same bypass, which is a
+  # far bigger hole than this job's own blast radius. Merging a PR needs no
+  # bypass at all: it is the standard, already-allowed path, so this design
+  # adds no new privileged identity to the repository.
+  #
   # Receives NO Central/npm/signing secrets; the GITHUB_TOKEN exists only in
-  # the push step. Fails (non-fast-forward) if main moved since dispatch.
+  # the push/PR steps. A genuine conflict (something else changed
+  # build.gradle.kts concurrently) fails the merge instead of silently
+  # resolving it.
   # ---------------------------------------------------------------------------
   prepare-release:
     name: Create release commit and tag
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     needs: validate
     permissions:
-      # push release commit + tag to main (requires ruleset bypass for the
-      # GitHub Actions app, see docs/release-security.md#repository-rules)
-      contents: write
+      contents: write # push the release branch and the tag
+      pull-requests: write # open and auto-merge the release PR
     outputs:
       release_commit_sha: ${{ steps.commit.outputs.release_commit_sha }}
     steps:
@@ -229,6 +242,16 @@ jobs:
           ref: ${{ needs.validate.outputs.release_sha }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Refuse a stale release branch
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "release/${VERSION}" >/dev/null 2>&1; then
+            echo "::error::Branch release/${VERSION} already exists on origin (leftover from a previous run?). Delete it and re-run."
+            exit 1
+          fi
 
       - name: Set release version and create release commit and tag
         id: commit
@@ -263,6 +286,8 @@ jobs:
 
           set_version "${VERSION}"
           git commit -am "chore(release): release ${VERSION}"
+          # Tag object is created locally now (pointing at this exact commit)
+          # but only pushed once the PR below has actually merged into main.
           git tag -a "${TAG}" -m "Release ${VERSION}"
           echo "release_commit_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
 
@@ -280,30 +305,89 @@ jobs:
           git commit -am "chore(release): prepare next development version ${DEV_VERSION}"
 
       # The token is only present in this step's env, never persisted to disk
-      # or exposed to any build tool. The non-fast-forward push doubles as the
-      # "fail if main moved during the release" policy.
-      - name: Push release commits and tag to main
+      # or exposed to any build tool.
+      - name: Push release branch
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
-          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-
-          git fetch origin main
-          if [[ "$(git rev-parse origin/main)" != "${RELEASE_SHA}" ]]; then
-            echo "::error::main moved while the release was running (expected ${RELEASE_SHA}). Start a new release run."
-            exit 1
-          fi
 
           ASKPASS="$(mktemp)"
           trap 'rm -f "${ASKPASS}"' EXIT
           printf '#!/bin/sh\nprintf %%s "${GITHUB_TOKEN}"\n' > "${ASKPASS}"
           chmod 700 "${ASKPASS}"
 
-          GIT_ASKPASS="${ASKPASS}" git push --atomic \
+          GIT_ASKPASS="${ASKPASS}" git push \
             "https://x-access-token@github.com/${GITHUB_REPOSITORY}.git" \
-            "HEAD:refs/heads/main" "refs/tags/${TAG}"
+            "HEAD:refs/heads/release/${VERSION}"
+
+      - name: Open and auto-merge release PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          PR_URL="$(gh pr create --base main --head "release/${VERSION}" \
+            --title "chore(release): ${VERSION}" \
+            --body "Automated release commit and next-development version bump for ${TAG}. This PR is required because main is protected; once merged, the release continues automatically.")"
+          PR_NUMBER="${PR_URL##*/}"
+          echo "pr_number=${PR_NUMBER}" >> "${GITHUB_OUTPUT}"
+          gh pr merge "${PR_NUMBER}" --merge --auto --delete-branch
+
+      # Waits for GitHub's native auto-merge to land the PR (e.g. once required
+      # status checks pass). Fails fast on a real conflict or on the PR being
+      # closed unmerged, instead of spinning for the full timeout.
+      - name: Wait for release PR to merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          ELAPSED=0
+          TIMEOUT=900
+          while true; do
+            STATE="$(gh pr view "${PR_NUMBER}" --json state --jq '.state')"
+            if [[ "${STATE}" == "MERGED" ]]; then
+              break
+            fi
+            if [[ "${STATE}" == "CLOSED" ]]; then
+              echo "::error::Release PR #${PR_NUMBER} was closed without merging."
+              exit 1
+            fi
+            MERGEABLE="$(gh pr view "${PR_NUMBER}" --json mergeable --jq '.mergeable')"
+            if [[ "${MERGEABLE}" == "CONFLICTING" ]]; then
+              echo "::error::Release PR #${PR_NUMBER} conflicts with main (something else changed build.gradle.kts concurrently). Resolve manually and re-run the release."
+              exit 1
+            fi
+            if (( ELAPSED >= TIMEOUT )); then
+              echo "::error::Timed out waiting for release PR #${PR_NUMBER} to merge (state=${STATE}). Check required status checks / branch protection."
+              exit 1
+            fi
+            sleep 15
+            ELAPSED=$((ELAPSED + 15))
+          done
+
+      # Only pushed after the commit above is confirmed to be reachable from
+      # main via the merge, so the tag can never point at unmerged content.
+      - name: Push release tag
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          ASKPASS="$(mktemp)"
+          trap 'rm -f "${ASKPASS}"' EXIT
+          printf '#!/bin/sh\nprintf %%s "${GITHUB_TOKEN}"\n' > "${ASKPASS}"
+          chmod 700 "${ASKPASS}"
+
+          GIT_ASKPASS="${ASKPASS}" git push \
+            "https://x-access-token@github.com/${GITHUB_REPOSITORY}.git" \
+            "refs/tags/${TAG}"
 
   # ---------------------------------------------------------------------------
   # build-and-test: full Gradle build from the immutable release commit with NO

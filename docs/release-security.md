@@ -70,14 +70,28 @@ token. The two privileged jobs check out no repository code: the only code
 running while credentials are available is the audited shell inline in the
 workflow file (itself protected on `main`).
 
-## Trusted commit capture and the "main moved" policy
+## Trusted commit capture and landing the release commit on main
 
-Identical to zenwave-sdk: `github.sha` is resolved once at dispatch; the run
-refuses non-`main` dispatch, verifies reachability from `origin/main`, and
-threads the SHA (and derived release commit) through every job. **Policy: fail
-if `main` moved** — `prepare-release` re-checks `origin/main` before its
-atomic, non-fast-forward push; if you pushed mid-release, the run fails before
-any tag or commit exists.
+`github.sha` is resolved once at dispatch; the run refuses non-`main`
+dispatch, verifies reachability from `origin/main`, and threads the SHA (and
+derived release commit) through every job.
+
+`prepare-release` does **not** push directly to `main`. It pushes the release
+commit and the next-SNAPSHOT commit to a throwaway `release/<version>`
+branch, opens a PR into `main`, enables GitHub's native auto-merge, and waits
+for the PR to actually merge before pushing the tag. This is deliberate:
+`main`'s ruleset requires a pull request, and the only way to push directly
+despite that would be adding a bypass actor to the ruleset. Ruleset bypass is
+granted to an **identity** (e.g. "GitHub Actions"), not to this one job —
+every other workflow in the repository capable of authenticating as that
+identity would inherit the same bypass, which is a strictly larger hole than
+this job's own blast radius. Merging a PR needs no bypass at all: it is the
+standard, already-allowed path, so this design adds no new privileged
+identity to the repository. A genuine conflict (something else changed
+`build.gradle.kts` concurrently) fails the wait step outright instead of
+silently resolving; the run also refuses to start if a stale
+`release/<version>` branch is still sitting on origin from a previous failed
+attempt.
 
 ## Release commit and tag
 
@@ -86,10 +100,11 @@ The version bump is a deterministic `sed` replacement of the single top-level
 invocation, so the only job with a write token before publication executes no
 repository-controlled code at all. The job fails if the file does not contain
 exactly one version line, if the result does not match the expected line, or
-if anything other than `build.gradle.kts` changed. Both commits (release +
-next SNAPSHOT) and the annotated tag `vX.Y.Z` are pushed atomically. The
-privileged jobs later re-verify tag → release-commit → reachable-from-main via
-the GitHub API.
+if anything other than `build.gradle.kts` changed. The annotated tag `vX.Y.Z`
+is created locally right after the release commit but is only pushed after
+the release PR has actually merged, so it can never point at unmerged
+content. The privileged jobs later re-verify tag → release-commit →
+reachable-from-main via the GitHub API.
 
 ## Artifact trust boundary
 
@@ -203,16 +218,23 @@ required reviewers.
 
 ### Repository rules
 
-Same as zenwave-sdk:
-
 - **`main` ruleset**: require PR (approvals 0 while solo — you cannot approve
   your own PRs; enable code-owner review once a second maintainer exists),
-  require status checks, block force pushes and deletion, enforce for admins,
-  bypass **only** for the GitHub Actions app (so `prepare-release` can push
-  the release commits), Settings → Actions → Workflow permissions set to
-  **read-only** default.
-- **Tag ruleset `v*`**: creation only via the bypass actor; updates and
-  deletions blocked for everyone (immutable tags).
+  block force pushes and deletion, enforce for admins, Settings → Actions →
+  Workflow permissions set to **read-only** default. **No bypass actor is
+  configured or needed** — `prepare-release` lands its commits through a
+  real, auto-merged PR (see above), not a direct push, so there is no
+  privileged identity to grant. If you also require status checks on `main`,
+  make sure at least one check actually runs on `pull_request` events (this
+  repo's CI currently only triggers on `push`/`workflow_dispatch`), otherwise
+  the release PR's auto-merge will wait until `prepare-release`'s own
+  15-minute timeout and fail.
+- **Tag ruleset `v*`**: block updates and deletions for everyone (immutable
+  tags). Tag **creation** does not need to be restricted to a bypass actor:
+  by the time `prepare-release` pushes a tag, the commit it points to has
+  already gone through the required-PR merge into `main`, so an unrestricted
+  `git push origin refs/tags/vX.Y.Z` from the default token grants no extra
+  power — it can only ever label a commit that already passed review.
 - **CODEOWNERS** (`.github/CODEOWNERS`) covers `.github/`, Gradle build files
   and wrapper, `kotlin-js-store/` (Kotlin/JS yarn lockfile),
   `nodejs-test-project/`, `release-notes/` and the release docs. Ineffective
@@ -231,6 +253,12 @@ Identical model to zenwave-sdk:
   can never rebuild a different commit under the same version. "Re-run all
   jobs" after `prepare-release` succeeded fails fast in `validate` (tag
   exists): intentional duplicate protection. Artifacts are retained 14 days.
+- if `prepare-release` itself fails **after** pushing the `release/<version>`
+  branch (e.g. the merge-wait step timed out because required status checks
+  never reported), do not just re-run the job — it will refuse to start
+  because that branch still exists on origin. Check the open release PR
+  first: merge it manually if it is just stalled, or close the PR and delete
+  the branch if you want to abort, then re-run.
 
 ## Snapshot publication
 
