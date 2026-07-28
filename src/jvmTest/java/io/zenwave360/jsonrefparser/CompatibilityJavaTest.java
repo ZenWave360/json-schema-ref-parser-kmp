@@ -33,8 +33,19 @@ public class CompatibilityJavaTest {
                 .getOriginalRefsList()
                 .get(0);
 
-        assertTrue(firstRef.getKey().getRef().contains("#") || firstRef.getKey().getRef().contains(".avsc"));
-        assertEquals(URI.create(firstRef.getKey().getRef()), firstRef.getKey().getURI());
+        String ref = firstRef.getKey().getRef();
+        URI resolvedUri = firstRef.getKey().getURI();
+        assertTrue(ref.contains("#") || ref.contains(".avsc"));
+        if (ref.startsWith("#")) {
+            // Internal refs have no separate target file: getURI() falls back to the ref itself.
+            assertEquals(URI.create(ref), resolvedUri);
+        } else {
+            // External refs resolve to the absolute target *file* URI, with any JSON Pointer
+            // fragment (e.g. "#/1") stripped -- getURI() and getRef() are expected to differ.
+            String filePart = ref.contains("#") ? ref.substring(0, ref.indexOf('#')) : ref;
+            String fileName = filePart.substring(filePart.lastIndexOf('/') + 1);
+            assertTrue(resolvedUri.toString().endsWith(fileName));
+        }
         assertTrue(firstRef.getKey().getRefFormat() == RefFormat.INTERNAL
                 || firstRef.getKey().getRefFormat() == RefFormat.RELATIVE
                 || firstRef.getKey().getRefFormat() == RefFormat.CLASSPATH);

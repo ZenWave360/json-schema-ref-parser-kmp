@@ -1,5 +1,5 @@
 [versions]
-kotlin = "2.0.21"
+kotlin = "2.2.21"
 kover = "0.9.4"
 kotlin-node = "18.16.12-pre.610"
 kotlinx-coroutines = "1.8.1"
