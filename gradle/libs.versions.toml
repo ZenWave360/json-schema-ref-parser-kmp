@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.2.21"
-kover = "0.9.8"
+kover = "0.9.9"
 kotlin-node = "22.10.2-pre.860"
 kotlinx-coroutines = "1.11.0"
 maven-publish = "0.37.0"
