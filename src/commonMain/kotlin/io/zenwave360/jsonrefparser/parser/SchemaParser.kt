@@ -16,7 +16,7 @@ internal data class RawDocument(
     val locations: MutableMap<String, SourceLocation>,
 )
 
-private val loadSettings: LoadSettings = LoadSettings.builder().build()
+private val loadSettings: LoadSettings = LoadSettings()
 
 /** Parse YAML/JSON/AVSC text and return a [RawDocument] with map-of-maps and source locations. */
 internal fun parseText(text: String, fileUri: String): RawDocument {

@@ -273,7 +273,7 @@ data class JsonLocation(
     val columnNr: Int,
 )
 
-class `$RefParser`(
+class `$RefParser` @JvmOverloads constructor(
     private val uri: String,
     private val sourceText: String? = null,
 ) {
