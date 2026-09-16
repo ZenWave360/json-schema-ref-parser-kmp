@@ -5,6 +5,8 @@ import io.zenwave360.jsonrefparser.io.DocumentLoader
 import io.zenwave360.jsonrefparser.model.AuthenticationValue
 import io.zenwave360.jsonrefparser.model.CircularReferenceException
 import io.zenwave360.jsonrefparser.model.MissingRefException
+import io.zenwave360.jsonrefparser.platform.CapabilityUnavailableException
+import io.zenwave360.jsonrefparser.platform.RefParserPlatform
 import io.zenwave360.jsonrefparser.model.OnCircular
 import io.zenwave360.jsonrefparser.model.OnMissing
 import io.zenwave360.jsonrefparser.model.OriginalAllOf
@@ -374,9 +376,17 @@ private fun collectAllOf(acc: AllOfAccumulator, item: Map<String, Any?>) {
 // ---------------------------------------------------------------------------
 
 private suspend fun loadFile(uri: String, ctx: ResolvingContext): String? {
-    val loader = ctx.loaders.firstOrNull { it.canLoad(uri) } ?: return null
+    val loader = ctx.loaders.firstOrNull { it.canLoad(uri) }
+    if (loader == null) {
+        // Report a missing platform facility as such, rather than as a missing document.
+        val unavailable = RefParserPlatform.unavailableFor(uri)
+        if (unavailable != null && ctx.options.onMissing == OnMissing.FAIL) throw unavailable
+        return null
+    }
     return try {
         loader.load(uri)
+    } catch (e: CapabilityUnavailableException) {
+        if (ctx.options.onMissing == OnMissing.SKIP) null else throw e
     } catch (e: Exception) {
         if (ctx.options.onMissing == OnMissing.SKIP) null
         else throw MissingRefException("Failed to load: $uri", e)

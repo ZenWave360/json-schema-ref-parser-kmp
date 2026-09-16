@@ -4,7 +4,7 @@ import io.zenwave360.jsonrefparser.model.AuthenticationValue
 import io.zenwave360.jsonrefparser.model.AuthenticationType
 import kotlinx.coroutines.await
 
-// External declarations for the Node.js 18+ built-in `fetch` API
+// External declaration for the global `fetch` API (Node.js 18+, browsers and Web Workers)
 @JsName("fetch")
 private external fun nativeFetch(url: String, init: dynamic = definedExternally): kotlin.js.Promise<dynamic>
 
@@ -12,7 +12,7 @@ private external fun nativeFetch(url: String, init: dynamic = definedExternally)
 private external fun nativeEncodeURIComponent(value: String): String
 
 /**
- * Loads schema documents over HTTP/HTTPS using the Node.js `fetch` API.
+ * Loads schema documents over HTTP/HTTPS using the global `fetch` API, on Node.js and in browsers.
  * Supports [AuthenticationValue] header injection with URL matching.
  */
 class FetchLoader(

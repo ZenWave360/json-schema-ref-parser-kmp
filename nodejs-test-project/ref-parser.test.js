@@ -7,6 +7,7 @@ import {
     parseSchemaText,
     dereferenceSchema,
     dereferenceSchemaText,
+    refParserPlatform,
 } from '@zenwave360/json-schema-ref-parser-kmp';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -80,5 +81,12 @@ properties:
             document.documentLocations[externalSchemaUri]['/BusinessEventMetadata/properties/data/type'].file,
             externalSchemaUri,
         );
+    });
+
+    it('reports the node platform with filesystem and http capabilities', () => {
+        const platform = refParserPlatform();
+
+        assert.equal(platform.name, 'node');
+        assert.deepEqual([...platform.capabilities].sort(), ['jsonrefparser.filesystem', 'jsonrefparser.http']);
     });
 });

@@ -1,10 +1,14 @@
 package io.zenwave360.jsonrefparser.io
 
-import kotlin.js.JsModule
+import io.zenwave360.jsonrefparser.platform.nodeFs
 
 /**
  * Loads schema documents from the local filesystem using the Node.js `fs` module.
  * Handles `file://` URIs and bare filesystem paths.
+ *
+ * The `fs` module is resolved on the first [load], never when this library is loaded, so
+ * constructing this loader is safe in a browser. In a browser or Web Worker [load] throws
+ * [io.zenwave360.jsonrefparser.platform.CapabilityUnavailableException].
  */
 class NodeFsLoader : DocumentLoader {
 
@@ -22,11 +26,6 @@ class NodeFsLoader : DocumentLoader {
         return readUtf8File(filePath)
     }
 
-    private fun readUtf8File(filePath: String): String =
-        NodeFsModule.readFileSync(filePath, "utf8")
-}
-
-@JsModule("node:fs")
-private external object NodeFsModule {
-    fun readFileSync(filePath: String, encoding: String): String
+    private suspend fun readUtf8File(filePath: String): String =
+        nodeFs().readFileSync(filePath, "utf8") as String
 }

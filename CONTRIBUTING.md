@@ -16,7 +16,7 @@
 # Run JVM tests
 ./gradlew jvmTest
 
-# Run JS tests
+# Run JS tests (Node.js and a headless Chromium browser; set CHROME_BIN if needed)
 ./gradlew jsTest
 
 # Run tests with coverage reports
