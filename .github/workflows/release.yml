@@ -34,6 +34,8 @@ jobs:
   release:
     uses: ZenWave360/release-workflows/.github/workflows/release-gradle.yml@main
     with:
+      # Match the Node runtime configured for Kotlin/JS tests in build.gradle.kts.
+      node-version: "22.12.0"
       version: ${{ inputs.version }}
       development-version: ${{ inputs.developmentVersion }}
       artifact-id: json-schema-ref-parser-kmp

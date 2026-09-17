@@ -17,6 +17,8 @@ jobs:
   publish-snapshot:
     uses: ZenWave360/release-workflows/.github/workflows/publish-snapshots-gradle.yml@main
     with:
+      # Match the Node runtime configured for Kotlin/JS tests in build.gradle.kts.
+      node-version: "22.12.0"
       publish-npm: true
       npm-package: "@zenwave360/json-schema-ref-parser-kmp"
       npm-package-dir: build/js/packages/json-schema-ref-parser-kmp

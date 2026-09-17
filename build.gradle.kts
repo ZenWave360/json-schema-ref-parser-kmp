@@ -41,7 +41,8 @@ kotlin {
         compilations["main"].packageJson {
             customField("name", "@zenwave360/json-schema-ref-parser-kmp")
             customField("version", npmVersion)
-            customField("type", "module")
+            // useEsModules() emits .mjs files, which Node always loads as ES modules.
+            // Keep .js tooling configs (notably webpack.config.js) in CommonJS mode.
             customField("types", "kotlin/json-schema-ref-parser-kmp.d.mts")
             customField("files", listOf("kotlin/", "README.md", "LICENSE"))
             customField("homepage", "https://github.com/ZenWave360/json-schema-ref-parser-kmp")

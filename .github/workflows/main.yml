@@ -11,3 +11,6 @@ permissions:
 jobs:
   build:
     uses: ZenWave360/release-workflows/.github/workflows/main-gradle.yml@main
+    with:
+      # Match the Node runtime configured for Kotlin/JS tests in build.gradle.kts.
+      node-version: "22.12.0"
