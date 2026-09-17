@@ -9,6 +9,9 @@ plugins {
 group = "io.zenwave360.jsonrefparser"
 version = "1.0.0-SNAPSHOT"
 
+val npmVersion = providers.gradleProperty("npmVersion")
+    .getOrElse(version.toString().replace("-SNAPSHOT", "-next.0"))
+
 repositories {
     mavenCentral()
 }
@@ -34,8 +37,23 @@ kotlin {
         }
         binaries.executable()
         useEsModules()
+        generateTypeScriptDefinitions()
         compilations["main"].packageJson {
             customField("name", "@zenwave360/json-schema-ref-parser-kmp")
+            customField("version", npmVersion)
+            customField("type", "module")
+            customField("types", "kotlin/json-schema-ref-parser-kmp.d.mts")
+            customField("files", listOf("kotlin/", "README.md", "LICENSE"))
+            customField("homepage", "https://github.com/ZenWave360/json-schema-ref-parser-kmp")
+            customField("repository", mapOf(
+                "type" to "git",
+                "url" to "https://github.com/ZenWave360/json-schema-ref-parser-kmp"
+            ))
+            customField("publishConfig", mapOf(
+                "access" to "public",
+                "registry" to "https://registry.npmjs.org/",
+                "tag" to if (npmVersion.contains("-")) "next" else "latest"
+            ))
             customField("description", "JSON Schema \$ref parser for Kotlin Multiplatform (JVM, Node.js and browsers)")
             customField("license", "MIT")
         }
@@ -62,6 +80,16 @@ kotlin {
         val jvmTest by getting
         val jsMain by getting
         val jsTest by getting
+    }
+}
+
+tasks.named("jsProductionExecutableCompileSync") {
+    inputs.files("README.md", "LICENSE").withPropertyName("npmDocumentation")
+    doLast {
+        copy {
+            from("README.md", "LICENSE")
+            into(layout.buildDirectory.dir("js/packages/json-schema-ref-parser-kmp"))
+        }
     }
 }
 
