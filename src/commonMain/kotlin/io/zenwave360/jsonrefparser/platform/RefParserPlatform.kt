@@ -5,8 +5,11 @@ package io.zenwave360.jsonrefparser.platform
  * (for example reading the local filesystem from a browser or a Web Worker).
  *
  * It reports an absent platform facility, not a defect: use [RefParserPlatform.isAvailable]
- * to find out beforehand. Libraries built on top of this one throw the same type for their
- * own capability ids.
+ * to find out beforehand.
+ *
+ * [capability] is always one of this library's own ids, declared on [RefParserPlatform]. A library
+ * built on top of this one declares its own capability ids and its own exception type for them,
+ * so that its failures stay legible without reference to a `$ref` parser.
  *
  * @param capability the capability id, e.g. [RefParserPlatform.FILESYSTEM]
  * @param platform   the platform name, `"jvm"`, `"node"` or `"browser"`
