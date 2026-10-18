@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.zenwave360.jsonrefparser"
-version = "1.0.0-SNAPSHOT"
+version = "0.9.24"
 
 val npmVersion = providers.gradleProperty("npmVersion")
     .getOrElse(version.toString().replace("-SNAPSHOT", "-next.0"))
