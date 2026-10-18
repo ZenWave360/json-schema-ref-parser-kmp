@@ -432,6 +432,44 @@ const doc = parseSchemaText("{\"type\":\"object\"}", "memory://schema.json");
 console.log(doc.locations[""]);
 ```
 
+### Browsers and Web Workers
+
+The JS artifact also loads in a browser or a Web Worker. The Node.js `fs` module is resolved only when a
+file is actually read, so loading the library never requires Node.js. In a browser, `FetchLoader` reads
+`http(s)://` documents with the global `fetch`, and reaching a `file:` or `classpath:` URI throws
+`CapabilityUnavailableException` instead of a generic error.
+
+Supply your own loader when content is only reachable through the embedding application:
+
+```kotlin
+val workspaceLoader = object : DocumentLoader {
+    override fun canLoad(uri: String) = uri.startsWith("workspace://")
+    override suspend fun load(uri: String): String = readFromHost(uri)
+}
+
+val doc = RefParser("workspace://specs/openapi.yml")
+    .withLoaders(workspaceLoader)
+    .dereference()
+    .getParsedDocument()
+```
+
+Ask what is available before depending on it; asking never throws:
+
+```kotlin
+RefParserPlatform.name                                         // "jvm", "node" or "browser"
+RefParserPlatform.isAvailable(RefParserPlatform.FILESYSTEM)    // false in a browser
+```
+
+```js
+import { refParserPlatform } from "@zenwave360/json-schema-ref-parser-kmp";
+
+refParserPlatform(); // { name: "browser", capabilities: ["jsonrefparser.http"] }
+```
+
+The build runs `jsBrowserTest` (Karma with a headless Chromium browser) as part of `check`, so a
+module-level Node.js import fails the build. Set `CHROME_BIN` if Chrome, Chromium or Edge is not found
+in a standard location.
+
 ## JSON Merge Patch
 
 The generic core module contains a non-mutating, graph-safe JSON Merge Patch utility:

@@ -10,6 +10,7 @@ import io.zenwave360.jsonrefparser.model.RefParserOptions
 import io.zenwave360.jsonrefparser.model.ResolvedRef
 import io.zenwave360.jsonrefparser.model.SourceLocation
 import io.zenwave360.jsonrefparser.parser.parseText
+import io.zenwave360.jsonrefparser.platform.RefParserPlatform
 import io.zenwave360.jsonrefparser.resolver.ResolvingContext
 import io.zenwave360.jsonrefparser.resolver.mergeAllOf
 import io.zenwave360.jsonrefparser.resolver.resolveDocument
@@ -81,7 +82,8 @@ class RefParser(
      */
     suspend fun parse(): RefParser {
         val loader = loaders.firstOrNull { it.canLoad(normalizedUri) }
-            ?: throw IllegalStateException("No loader available for URI: $normalizedUri")
+            ?: throw RefParserPlatform.unavailableFor(normalizedUri)
+                ?: IllegalStateException("No loader available for URI: $normalizedUri")
         val text = loader.load(normalizedUri)
         val raw = parseText(text, normalizedUri)
         schema = raw.map

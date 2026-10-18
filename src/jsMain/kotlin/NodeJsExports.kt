@@ -6,6 +6,7 @@ import io.zenwave360.jsonrefparser.model.ParsedDocument
 import io.zenwave360.jsonrefparser.model.ResolvedRef
 import io.zenwave360.jsonrefparser.model.SourceLocation
 import io.zenwave360.jsonrefparser.parser.parseText
+import io.zenwave360.jsonrefparser.platform.RefParserPlatform
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.promise
@@ -26,6 +27,21 @@ fun parseSchemaText(input: String, baseUri: String = "memory://anonymous"): Any?
             documentLocations = mapOf(raw.uri to raw.locations),
         ),
     )
+}
+
+/**
+ * Reports the platform this library is running on and the capabilities available there,
+ * as `{ name: "node" | "browser", capabilities: string[] }`. Never throws.
+ */
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+fun refParserPlatform(): Any? {
+    val result = js("{}")
+    result.name = RefParserPlatform.name
+    val capabilities = js("[]")
+    RefParserPlatform.capabilities().forEach { capabilities.push(it) }
+    result.capabilities = capabilities
+    return result
 }
 
 @OptIn(ExperimentalJsExport::class, DelicateCoroutinesApi::class)
