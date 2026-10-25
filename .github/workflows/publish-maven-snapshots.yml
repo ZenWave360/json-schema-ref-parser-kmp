@@ -4,6 +4,12 @@ on:
   push:
     branches: [develop, next]
   workflow_dispatch:
+    inputs:
+      publish-snapshots:
+        description: "Also publish the SNAPSHOT to Maven Central (snapshots always go to zenwave360/maven-snapshots)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -15,8 +21,11 @@ concurrency:
 
 jobs:
   publish-snapshot:
-    uses: ZenWave360/release-workflows/.github/workflows/publish-snapshots-gradle.yml@main
+    # Pilot for git-maven-publisher snapshots (zenwave360/maven-snapshots, branch main); back to @main once merged there.
+    uses: ZenWave360/release-workflows/.github/workflows/publish-snapshots-gradle.yml@feature/git-snapshots
     with:
+      publish-snapshots: ${{ github.event_name == 'workflow_dispatch' && inputs.publish-snapshots }}
+      publish-git-snapshots: true
       # Match the Node runtime configured for Kotlin/JS tests in build.gradle.kts.
       node-version: "22.12.0"
       publish-npm: true
@@ -27,3 +36,4 @@ jobs:
       CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
       SIGN_KEY: ${{ secrets.SIGN_KEY }}
       SIGN_KEY_PASS: ${{ secrets.SIGN_KEY_PASS }}
+      GIT_PUBLISHER_TOKEN: ${{ secrets.GIT_PUBLISHER_TOKEN }}
